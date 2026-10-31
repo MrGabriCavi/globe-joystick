@@ -1,0 +1,1295 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05060a">
+<title>Globe Joystick</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05060a;
+    --ink: #e8e6df;
+    --dim: #7c7c88;
+    --red: #ff2a2a;
+    --amber: #ffb000;
+    --green: #39ff7a;
+    --stick: clamp(130px, min(40vw, 34vh), 220px);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, Consolas, monospace;
+  }
+  body {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* HUD */
+  .hud {
+    position: fixed; pointer-events: none;
+    top: calc(14px + env(safe-area-inset-top)); left: calc(16px + env(safe-area-inset-left));
+  }
+  .title { font-size: 14px; letter-spacing: 2px; color: var(--amber); text-shadow: 0 0 8px rgba(255,176,0,.55); }
+  .title span { color: var(--red); }
+  .coords { margin-top: 10px; font-size: 9px; color: var(--green); text-shadow: 0 0 6px rgba(57,255,122,.45); }
+  .status { margin-top: 8px; font-size: 8px; color: var(--amber); min-height: 1em; }
+  .satbar { margin-top: 4px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .satbar select {
+    pointer-events: auto; cursor: pointer;
+    font: 8px 'Press Start 2P', ui-monospace, monospace; color: var(--amber);
+    background: #111116; border: 1px solid #33333d; border-radius: 6px; padding: 6px 8px;
+  }
+  .satinfo { font-size: 7px; color: var(--dim); line-height: 1.6; }
+
+  /* Schedina del satellite */
+  .card {
+    position: fixed; z-index: 5;
+    top: calc(64px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
+    width: 310px; max-height: calc(100dvh - var(--stick) - 150px); overflow-y: auto;
+    padding: 16px; border-radius: 14px;
+    background: rgba(12,12,16,.94); border: 1px solid #2a2a33;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6);
+    font: 12px/1.45 ui-monospace, Consolas, monospace; color: var(--ink);
+    -webkit-user-select: text; user-select: text;
+  }
+  .card-title { font: 11px/1.6 'Press Start 2P', monospace; color: var(--amber); padding-right: 30px; }
+  .card-sub { margin-top: 6px; color: var(--dim); }
+  .card-img { display: block; width: 100%; height: 140px; object-fit: cover; border-radius: 8px; margin-top: 12px; background: #111; }
+  .card-credit { display: block; margin-top: 4px; font-size: 10px; color: var(--dim); text-decoration: none; }
+  .card-credit:hover { color: var(--amber); }
+  .card-desc { margin: 10px 0 0; font: 13px/1.45 system-ui, sans-serif; color: #c9c7c0; }
+  .card-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 12px 0 0; }
+  .card-grid dt { color: var(--dim); }
+  .card-grid dd { margin: 0; text-align: right; color: var(--green); }
+  .card-grid + .card-grid { border-top: 1px solid #22222a; padding-top: 12px; }
+  .card-close {
+    position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%;
+    border: 1px solid #33333d; background: #1a1a20; color: var(--ink); font-size: 14px; cursor: pointer;
+  }
+  .card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .pill {
+    font: 8px 'Press Start 2P', monospace; padding: 9px 11px; border-radius: 999px; cursor: pointer;
+    border: 1px solid #3a3a44; background: #16161c; color: var(--ink); text-decoration: none;
+  }
+  .pill:hover { border-color: var(--amber); color: var(--amber); }
+  .overhead-btn { pointer-events: auto; color: #4fe3ff; border-color: #22505a; }
+  .card-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .card-list p { margin: 0 0 4px; font: 13px/1.45 system-ui, sans-serif; color: #c9c7c0; }
+  .card-list .pill { align-self: flex-start; }
+  .sat-row {
+    display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 10px;
+    border: 1px solid #26262e; border-radius: 8px; background: #121218; color: var(--ink);
+    font: 12px ui-monospace, Consolas, monospace; text-align: left; cursor: pointer;
+  }
+  .sat-row span:last-child { color: #4fe3ff; white-space: nowrap; }
+  .sat-row:hover { border-color: #4fe3ff; }
+  .hint {
+    position: fixed; margin: 0; pointer-events: none;
+    top: calc(14px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
+    max-width: 320px; text-align: right; font-size: 8px; line-height: 1.8; color: var(--dim);
+  }
+
+  /* Pannello comandi stile cabinato */
+  .deck {
+    position: fixed;
+    right: calc(16px + env(safe-area-inset-right));
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 18px;
+    padding: 20px 20px 16px;
+    background: linear-gradient(#18181e, #09090c);
+    border: 1px solid #2a2a33; border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.06);
+    touch-action: none;
+  }
+  .deck::before {
+    content: ''; position: absolute; left: 18px; right: 18px; top: 0; height: 5px;
+    background: linear-gradient(90deg, var(--red) 0 33%, #ff7a00 33% 66%, #ffd000 66%);
+    border-radius: 0 0 4px 4px;
+  }
+  .deck::after {
+    content: 'PLAYER 1'; position: absolute; left: 22px; top: 10px;
+    font-size: 6px; color: #4a4a55; letter-spacing: 1px;
+  }
+
+  #stick { width: var(--stick); height: var(--stick); display: block; touch-action: none; cursor: grab; }
+  #stick.grabbing { cursor: grabbing; }
+
+  .readout { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 92px; }
+  .leds { display: grid; grid-template-columns: repeat(3, 22px); gap: 5px; }
+  .leds span {
+    width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center;
+    background: #1c0707; color: #552020; font: 11px/1 system-ui, sans-serif;
+    transition: background .08s, box-shadow .08s, color .08s;
+  }
+  .leds span.on { background: var(--red); color: #fff; box-shadow: 0 0 10px var(--red); }
+  .leds span.center { background: #06180d; color: #1d4a2c; }
+  .leds span.center.on { background: var(--green); color: #032; box-shadow: 0 0 10px var(--green); }
+  .vals { width: 100%; font-size: 7px; line-height: 1.9; color: var(--green); }
+  .power { width: 100%; height: 6px; border-radius: 3px; background: #1b1b22; overflow: hidden; }
+  #powerBar { height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--amber) 60%, var(--red)); }
+
+  .buttons { display: flex; flex-direction: column; gap: 12px; }
+  .btn { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 6px; color: var(--dim); }
+  .arcade {
+    --c1: #ff9a9a; --c2: #e01010; --c3: #6a0000;
+    width: 50px; height: 50px; border: 0; border-radius: 50%; padding: 0; cursor: pointer;
+    background: radial-gradient(circle at 35% 30%, var(--c1), var(--c2) 45%, var(--c3));
+    box-shadow: 0 0 0 4px #040405, 0 5px 0 4px #040405, 0 8px 12px 4px rgba(0,0,0,.5), inset 0 -4px 6px rgba(0,0,0,.35);
+    transition: transform .06s, box-shadow .06s;
+    touch-action: manipulation;
+  }
+  .arcade.yellow { --c1: #fff2a0; --c2: #ffc400; --c3: #8a5a00; }
+  .arcade:active, .arcade.pressed {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 4px #040405, 0 2px 0 4px #040405, 0 3px 6px 4px rgba(0,0,0,.5), inset 0 -2px 4px rgba(0,0,0,.35);
+  }
+  .arcade:focus-visible { outline: 2px solid var(--amber); outline-offset: 6px; }
+
+  /* Telefono in verticale: pannello a tutta larghezza in basso */
+  @media (max-aspect-ratio: 1/1) {
+    .deck {
+      left: 0; right: 0; bottom: 0; justify-content: space-evenly; gap: 6px;
+      padding: 22px 10px calc(14px + env(safe-area-inset-bottom));
+      border-radius: 18px 18px 0 0; border-bottom: 0;
+    }
+    .hint { display: none; }
+    .card {
+      right: calc(12px + env(safe-area-inset-right));
+      top: calc(128px + env(safe-area-inset-top)); width: min(400px, calc(100vw - 24px));
+      max-height: min(calc(100dvh - var(--stick) - 200px), 42dvh);
+    }
+    .card-img { height: 90px; }
+  }
+  @media (max-width: 380px) {
+    .readout { width: 78px; }
+    .leds { grid-template-columns: repeat(3, 19px); gap: 4px; }
+    .leds span { width: 19px; height: 19px; }
+    .arcade { width: 42px; height: 42px; }
+  }
+</style>
+<script type="importmap">
+  { "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "satellite.js": "https://cdn.jsdelivr.net/npm/satellite.js@6.0.2/+esm"
+  } }
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<header class="hud">
+  <div class="title">GLOBE<span>·</span>STICK</div>
+  <div class="coords" id="coords">LAT --  LON --</div>
+  <div class="status" id="status">CARICAMENTO…</div>
+  <div class="satbar">
+    <select id="group" aria-label="Gruppo di satelliti"></select>
+    <button class="pill overhead-btn" id="btnOverhead">◎ SOPRA DI ME</button>
+    <div class="satinfo" id="satinfo"></div>
+  </div>
+</header>
+<p class="hint">Trascina la leva · Frecce o WASD<br>Rotella o pinch per lo zoom<br>Clic su un satellite per la scheda</p>
+
+<aside class="card" id="card" hidden>
+  <button class="card-close" id="cardClose" aria-label="Chiudi">✕</button>
+  <div class="card-title" id="cardTitle"></div>
+  <div class="card-sub" id="cardSub"></div>
+  <img class="card-img" id="cardImg" alt="" hidden>
+  <a class="card-credit" id="cardImgCredit" target="_blank" rel="noopener" hidden>Foto: Wikimedia Commons · autore e licenza ↗</a>
+  <p class="card-desc" id="cardDesc" hidden></p>
+  <dl class="card-grid" id="cardLive"></dl>
+  <dl class="card-grid" id="cardInfo"></dl>
+  <div class="card-list" id="cardList" hidden></div>
+  <div class="card-actions">
+    <button class="pill" id="cardCenter">CENTRA</button>
+    <a class="pill" id="cardN2yo" target="_blank" rel="noopener">N2YO ↗</a>
+    <a class="pill" id="cardWiki" target="_blank" rel="noopener" hidden>WIKI ↗</a>
+  </div>
+</aside>
+
+<section class="deck" id="deck">
+  <div class="readout">
+    <div class="leds" id="leds">
+      <span>↖</span><span>↑</span><span>↗</span>
+      <span>←</span><span class="center">●</span><span>→</span>
+      <span>↙</span><span>↓</span><span>↘</span>
+    </div>
+    <div class="vals"><div id="valX">X +0.00</div><div id="valY">Y +0.00</div></div>
+    <div class="power"><div id="powerBar"></div></div>
+  </div>
+  <canvas id="stick" role="application" aria-label="Joystick: trascina o usa le frecce"></canvas>
+  <div class="buttons">
+    <div class="btn"><button class="arcade" id="btnReset" aria-label="Torna a Roma"></button>RESET</div>
+    <div class="btn"><button class="arcade yellow" id="btnMode" aria-label="Cambia modalità"></button><span id="modeLabel">VOLA</span></div>
+  </div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import * as sat from 'satellite.js';
+
+const DEG = Math.PI / 180;
+const $ = (id) => document.getElementById(id);
+const setStatus = (msg) => { $('status').textContent = msg; };
+
+/* =========================================================================
+   Scena 3D
+   ========================================================================= */
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: $('scene'), antialias: true });
+} catch (err) {
+  setStatus('WEBGL NON DISPONIBILE');
+  throw err;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 200);
+
+// Luce fissa rispetto alla camera: la faccia visibile è sempre illuminata.
+scene.add(new THREE.AmbientLight(0xffffff, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+sun.position.set(-3, 2, 4);
+scene.add(sun);
+
+// earthPivot ruota con la leva. Tutto ciò che sta "sulla" Terra (marker,
+// satelliti, orbite) va dentro earthPivot, così gira insieme al globo.
+// Ordine Euler XYZ: prima spin sull'asse polare (Y), poi tilt sull'asse X.
+const earthPivot = new THREE.Group();
+scene.add(earthPivot);
+
+const earthMat = new THREE.MeshPhongMaterial({ color: 0x1a3d6d, shininess: 14, specular: 0x000000 });
+const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 96), earthMat);
+earthPivot.add(earth);
+
+// Layer per i futuri satelliti: posizioni in coordinate geografiche (lat, lon, quota).
+const satellitesLayer = new THREE.Group();
+earthPivot.add(satellitesLayer);
+
+// Alone atmosferico (sfera più grande, solo facce posteriori, blending additivo).
+const atmosphere = new THREE.Mesh(
+  new THREE.SphereGeometry(1.12, 64, 48),
+  new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec3 vN; varying vec3 vP;
+      void main() {
+        vec4 p = modelViewMatrix * vec4(position, 1.0);
+        vP = p.xyz; vN = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * p;
+      }`,
+    fragmentShader: `
+      varying vec3 vN; varying vec3 vP;
+      void main() {
+        float d = dot(vN, normalize(-vP));
+        float i = pow(smoothstep(0.0, 0.45, -d), 2.2);
+        gl_FragColor = vec4(0.32, 0.62, 1.0, 1.0) * i * 0.85;
+      }`,
+    side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false,
+  })
+);
+scene.add(atmosphere);
+
+// Stelle: figlie del pivot, così si muovono con la rotazione (effetto "orbita").
+{
+  const n = 2200, pos = new Float32Array(n * 3), v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    v.randomDirection().multiplyScalar(50 + Math.random() * 30);
+    pos.set([v.x, v.y, v.z], i * 3);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  earthPivot.add(new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0.8,
+  })));
+}
+
+// Texture della Terra (NASA Blue Marble, distribuite con three-globe).
+const TEX = 'https://cdn.jsdelivr.net/npm/three-globe@2.31.0/example/img/';
+const loader = new THREE.TextureLoader();
+loader.load(TEX + 'earth-blue-marble.jpg', (t) => {
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  earthMat.map = t;
+  earthMat.color.set(0xffffff);
+  earthMat.needsUpdate = true;
+  setStatus('');
+}, undefined, () => {
+  earthMat.map = fallbackTexture();
+  earthMat.color.set(0xffffff);
+  earthMat.needsUpdate = true;
+  setStatus('TEXTURE OFFLINE');
+});
+loader.load(TEX + 'earth-topology.png', (t) => {
+  earthMat.bumpMap = t; earthMat.bumpScale = 3; earthMat.needsUpdate = true;
+});
+loader.load(TEX + 'earth-water.png', (t) => {
+  earthMat.specularMap = t; earthMat.specular.set(0x3a4a5a); earthMat.needsUpdate = true;
+});
+
+// Griglia lat/lon disegnata al volo se le texture non si caricano (es. offline).
+function fallbackTexture() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 512;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, '#0d2a4a'); grad.addColorStop(0.5, '#1d5a8a'); grad.addColorStop(1, '#0d2a4a');
+  g.fillStyle = grad; g.fillRect(0, 0, 1024, 512);
+  g.strokeStyle = 'rgba(57,255,122,.35)'; g.lineWidth = 1;
+  for (let x = 0; x <= 1024; x += 1024 / 24) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 512); g.stroke(); }
+  for (let y = 0; y <= 512; y += 512 / 12) { g.beginPath(); g.moveTo(0, y); g.lineTo(1024, y); g.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* -------------------------------------------------------------------------
+   Coordinate geografiche -> punto 3D (stessa mappatura UV di SphereGeometry).
+   alt è in raggi terrestri: per un satellite a h km usa h / 6371.
+   ------------------------------------------------------------------------- */
+const EARTH_RADIUS_KM = 6371;
+function latLonToVector3(lat, lon, alt = 0, target = new THREE.Vector3()) {
+  const phi = (lon + 180) * DEG, theta = (90 - lat) * DEG, r = 1 + alt;
+  return target.set(
+    -r * Math.cos(phi) * Math.sin(theta),
+     r * Math.cos(theta),
+     r * Math.sin(phi) * Math.sin(theta),
+  );
+}
+
+function addMarker(lat, lon, { altKm = 0, color = 0xff3030, size = 0.014 } = {}) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(size, 16, 12), new THREE.MeshBasicMaterial({ color }));
+  latLonToVector3(lat, lon, altKm / EARTH_RADIUS_KM, m.position);
+  satellitesLayer.add(m);
+  return m;
+}
+
+const HOME = { lat: 41.9, lon: 12.5 }; // Roma
+addMarker(HOME.lat, HOME.lon);
+
+/* =========================================================================
+   Stato della vista e camera
+   ========================================================================= */
+const view = {
+  spin: 0, tilt: 0,       // rad
+  vSpin: 0, vTilt: 0,     // rad/s
+  zoom: 1,
+  zoomTarget: null,       // zoom animato (RESET, adattamento al gruppo di satelliti)
+  homing: null,           // { spin, tilt } durante RESET e CENTRA
+  mode: 'fly',            // 'fly': su = nord, destra = est · 'drag': ruoti il globo come con la mano
+};
+const MAX_SPIN = 110 * DEG;   // velocità a leva tutta spinta
+const MAX_TILT = 70 * DEG;
+const TILT_LIMIT = 80 * DEG;
+const DEADZONE = 0.08;
+
+function geoToView(lat, lon) {
+  return { tilt: THREE.MathUtils.clamp(lat * DEG, -TILT_LIMIT, TILT_LIMIT), spin: -Math.PI / 2 - lon * DEG };
+}
+function wrapPi(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
+Object.assign(view, geoToView(HOME.lat, HOME.lon));
+view.tilt = 28 * DEG;
+
+const deck = $('deck');
+function layout() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+
+  // Centra il globo nello spazio libero dal pannello: sopra (verticale) o a sinistra.
+  const d = deck.getBoundingClientRect();
+  const fullWidthDeck = deck.offsetWidth >= w - 2;
+  const top = fullWidthDeck ? 56 : 0;
+  const bottom = fullWidthDeck ? d.top : h;
+  const right = !fullWidthDeck && d.left > w * 0.5 ? d.left - 16 : w;
+  const centerX = right / 2, centerY = (top + bottom) / 2;
+  layout.radiusPx = Math.min(right, bottom - top) * 0.42;
+  camera.setViewOffset(w, h, w / 2 - centerX, h / 2 - centerY, w, h);
+  updateCameraDistance();
+}
+function updateCameraDistance() {
+  const h = window.innerHeight;
+  const px = layout.radiusPx * view.zoom;
+  const ang = Math.atan(px / (h / 2) * Math.tan(camera.fov * DEG / 2));
+  camera.position.set(0, 0, Math.max(1.08, 1 / Math.sin(ang)));
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', layout);
+layout();
+
+// Zoom: rotella e pinch a due dita sulla scena. Un tocco/clic breve seleziona un satellite.
+$('scene').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  view.zoomTarget = null;
+  setZoom(view.zoom * Math.exp(-e.deltaY * 0.0012));
+}, { passive: false });
+const pinch = new Map();
+let pinchDist = 0, tap = null;
+const pDist = () => { const [a, b] = [...pinch.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+$('scene').addEventListener('pointerdown', (e) => {
+  pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  tap = pinch.size === 1 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+  if (pinch.size === 2) pinchDist = pDist();
+});
+$('scene').addEventListener('pointermove', (e) => {
+  if (!pinch.has(e.pointerId)) return;
+  pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch.size === 2) { const d = pDist(); view.zoomTarget = null; setZoom(view.zoom * d / pinchDist); pinchDist = d; }
+});
+$('scene').addEventListener('pointerup', (e) => {
+  if (tap && tap.id === e.pointerId && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 8) {
+    selectSat(pickSatellite(e.clientX, e.clientY, e.pointerType === 'touch' ? 28 : 16));
+  }
+  tap = null;
+});
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) {
+  $('scene').addEventListener(ev, (e) => pinch.delete(e.pointerId));
+}
+function setZoom(z) { view.zoom = THREE.MathUtils.clamp(z, 0.12, 2.6); updateCameraDistance(); }
+
+/* =========================================================================
+   Joystick arcade
+   Valore normalizzato: x, y in [-1, 1], y positivo = leva spinta in alto.
+   ========================================================================= */
+const stick = $('stick');
+const g = stick.getContext('2d');
+const joy = {
+  x: 0, y: 0, vx: 0, vy: 0,
+  dragging: false, pointerId: null,
+  dragX: 0, dragY: 0,
+  keys: new Set(),
+  dirty: true,
+};
+const KNOB_TRAVEL = 0.27;      // escursione del pomello, in frazione del lato
+const SPRING_K = 260, SPRING_C = 24; // ritorno al centro: leggermente sotto-smorzato
+
+function sizeStick() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const s = Math.round(stick.clientWidth * dpr);
+  if (stick.width !== s) { stick.width = stick.height = s; joy.dirty = true; }
+}
+new ResizeObserver(() => { sizeStick(); layout(); }).observe(stick);
+sizeStick();
+
+function pointerToStick(e) {
+  const r = stick.getBoundingClientRect();
+  const travel = r.width * KNOB_TRAVEL;
+  let x = (e.clientX - (r.left + r.width / 2)) / travel;
+  let y = -(e.clientY - (r.top + r.height / 2)) / travel;
+  const m = Math.hypot(x, y);
+  if (m > 1) { x /= m; y /= m; }
+  joy.dragX = x; joy.dragY = y;
+}
+stick.addEventListener('pointerdown', (e) => {
+  if (joy.dragging) return;
+  e.preventDefault();
+  stick.setPointerCapture(e.pointerId);
+  joy.dragging = true; joy.pointerId = e.pointerId;
+  stick.classList.add('grabbing');
+  pointerToStick(e);
+  view.homing = null;
+});
+stick.addEventListener('pointermove', (e) => {
+  if (joy.dragging && e.pointerId === joy.pointerId) pointerToStick(e);
+});
+function release(e) {
+  if (e.pointerId !== joy.pointerId) return;
+  joy.dragging = false; joy.pointerId = null;
+  joy.vx = joy.vy = 0;
+  stick.classList.remove('grabbing');
+}
+stick.addEventListener('pointerup', release);
+stick.addEventListener('pointercancel', release);
+stick.addEventListener('lostpointercapture', release);
+stick.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Tastiera: frecce e WASD spostano la leva (con la stessa molla del ritorno).
+const KEYMAP = {
+  ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
+  ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
+};
+window.addEventListener('keydown', (e) => {
+  const k = KEYMAP[e.code];
+  if (k) { e.preventDefault(); joy.keys.add(k); view.homing = null; }
+  else if (e.code === 'KeyR') resetView();
+  else if (e.code === 'KeyM') toggleMode();
+  else if (e.code === 'Escape') selectSat(null);
+});
+window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) joy.keys.delete(k); });
+window.addEventListener('blur', () => joy.keys.clear());
+
+function updateJoystick(dt) {
+  const px = joy.x, py = joy.y;
+  if (joy.dragging) {
+    joy.x = joy.dragX; joy.y = joy.dragY;
+  } else {
+    let tx = (joy.keys.has('right') ? 1 : 0) - (joy.keys.has('left') ? 1 : 0);
+    let ty = (joy.keys.has('up') ? 1 : 0) - (joy.keys.has('down') ? 1 : 0);
+    const m = Math.hypot(tx, ty);
+    if (m > 1) { tx /= m; ty /= m; }
+    // Integrazione a passi fissi per tenere stabile la molla anche a pochi fps.
+    const steps = Math.ceil(dt / (1 / 240));
+    const h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      joy.vx += (SPRING_K * (tx - joy.x) - SPRING_C * joy.vx) * h;
+      joy.vy += (SPRING_K * (ty - joy.y) - SPRING_C * joy.vy) * h;
+      joy.x += joy.vx * h; joy.y += joy.vy * h;
+    }
+    if (Math.abs(joy.x - tx) < 1e-4 && Math.abs(joy.vx) < 1e-3) { joy.x = tx; joy.vx = 0; }
+    if (Math.abs(joy.y - ty) < 1e-4 && Math.abs(joy.vy) < 1e-3) { joy.y = ty; joy.vy = 0; }
+  }
+  if (joy.x !== px || joy.y !== py) joy.dirty = true;
+}
+
+// Valore con zona morta, riscalato in modo che appena fuori dalla zona parta da 0.
+function stickOutput() {
+  const m = Math.hypot(joy.x, joy.y);
+  if (m < DEADZONE) return { x: 0, y: 0, m: 0 };
+  const k = Math.min(1, (m - DEADZONE) / (1 - DEADZONE)) / m;
+  return { x: joy.x * k, y: joy.y * k, m: m * k };
+}
+
+function circle(x, y, r) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); }
+
+function drawStick() {
+  const S = stick.width, c = S / 2, travel = S * KNOB_TRAVEL;
+  g.clearRect(0, 0, S, S);
+
+  // Piastra di base
+  const pad = S * 0.035, w = S - pad * 2;
+  g.beginPath(); g.roundRect(pad, pad, w, w, S * 0.12);
+  let gr = g.createLinearGradient(0, pad, 0, S - pad);
+  gr.addColorStop(0, '#36363d'); gr.addColorStop(1, '#101013');
+  g.fillStyle = gr; g.fill();
+  g.lineWidth = S * 0.01; g.strokeStyle = 'rgba(255,255,255,.10)'; g.stroke();
+
+  // Viti negli angoli
+  const so = pad + S * 0.085, sr = S * 0.026;
+  for (const [x, y] of [[so, so], [S - so, so], [so, S - so], [S - so, S - so]]) {
+    circle(x, y, sr);
+    gr = g.createRadialGradient(x - sr * 0.4, y - sr * 0.4, 0, x, y, sr);
+    gr.addColorStop(0, '#e0e0e0'); gr.addColorStop(1, '#55555c');
+    g.fillStyle = gr; g.fill();
+    g.strokeStyle = '#2a2a2e'; g.lineWidth = S * 0.007;
+    g.beginPath(); g.moveTo(x - sr * 0.6, y + sr * 0.6); g.lineTo(x + sr * 0.6, y - sr * 0.6); g.stroke();
+  }
+
+  // Guida ottagonale (gate) e tacche delle 8 direzioni
+  const gateR = travel + S * 0.075;
+  g.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = Math.PI / 8 + i * Math.PI / 4, r = gateR / Math.cos(Math.PI / 8);
+    g[i ? 'lineTo' : 'moveTo'](c + Math.cos(a) * r, c + Math.sin(a) * r);
+  }
+  g.closePath();
+  gr = g.createRadialGradient(c, c, gateR * 0.2, c, c, gateR * 1.1);
+  gr.addColorStop(0, '#050506'); gr.addColorStop(1, '#141418');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = S * 0.008; g.stroke();
+  g.strokeStyle = 'rgba(255,176,0,.35)'; g.lineWidth = S * 0.01; g.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    g.beginPath();
+    g.moveTo(c + Math.cos(a) * gateR * 0.86, c + Math.sin(a) * gateR * 0.86);
+    g.lineTo(c + Math.cos(a) * gateR * 0.95, c + Math.sin(a) * gateR * 0.95);
+    g.stroke();
+  }
+
+  // Parapolvere
+  circle(c, c, S * 0.115);
+  gr = g.createRadialGradient(c, c - S * 0.03, 0, c, c, S * 0.115);
+  gr.addColorStop(0, '#2c2c30'); gr.addColorStop(1, '#030303');
+  g.fillStyle = gr; g.fill();
+
+  const kx = c + joy.x * travel, ky = c - joy.y * travel;
+  const br = S * 0.155 * (1 - 0.05 * Math.hypot(joy.x, joy.y));
+
+  // Ombra del pomello sulla piastra
+  const shx = c + joy.x * travel * 0.7 + S * 0.035, shy = c - joy.y * travel * 0.7 + S * 0.05;
+  gr = g.createRadialGradient(shx, shy, 0, shx, shy, br * 1.3);
+  gr.addColorStop(0, 'rgba(0,0,0,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; circle(shx, shy, br * 1.3); g.fill();
+
+  // Asta metallica
+  const dx = kx - c, dy = ky - c, len = Math.hypot(dx, dy);
+  if (len > 1) {
+    const sw = S * 0.065, nx = -dy / len * sw / 2, ny = dx / len * sw / 2;
+    gr = g.createLinearGradient(c + nx, c + ny, c - nx, c - ny);
+    gr.addColorStop(0, '#5a5a60'); gr.addColorStop(0.35, '#f2f2f2'); gr.addColorStop(0.7, '#8a8a90'); gr.addColorStop(1, '#2e2e33');
+    g.strokeStyle = gr; g.lineWidth = sw; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(c, c); g.lineTo(kx, ky); g.stroke();
+  }
+  circle(c, c, S * 0.042);
+  gr = g.createRadialGradient(c - S * 0.012, c - S * 0.012, 0, c, c, S * 0.042);
+  gr.addColorStop(0, '#d8d8d8'); gr.addColorStop(1, '#3a3a40');
+  g.fillStyle = gr; g.fill();
+
+  // Pomello a sfera rosso
+  circle(kx, ky, br);
+  gr = g.createRadialGradient(kx - br * 0.35, ky - br * 0.4, br * 0.05, kx, ky, br * 1.05);
+  gr.addColorStop(0, '#ffb0b0'); gr.addColorStop(0.22, '#ff3030'); gr.addColorStop(0.7, '#c00000'); gr.addColorStop(1, '#450000');
+  g.fillStyle = gr; g.fill();
+  g.lineWidth = S * 0.006; g.strokeStyle = 'rgba(0,0,0,.45)'; g.stroke();
+  g.save();
+  g.translate(kx - br * 0.38, ky - br * 0.46); g.rotate(-0.6);
+  g.beginPath(); g.ellipse(0, 0, br * 0.3, br * 0.17, 0, 0, Math.PI * 2);
+  g.fillStyle = 'rgba(255,255,255,.75)'; g.fill();
+  g.restore();
+}
+
+// Indicatore di direzione: 8 LED + centro, valori X/Y e barra di potenza.
+const leds = [...$('leds').children];
+const SECTOR_TO_LED = [5, 2, 1, 0, 3, 6, 7, 8]; // E, NE, N, NW, W, SW, S, SE
+let lastLed = -1;
+function updateIndicator(out) {
+  let led = 4;
+  if (out.m > 0) {
+    const sector = ((Math.round(Math.atan2(out.y, out.x) / (Math.PI / 4)) % 8) + 8) % 8;
+    led = SECTOR_TO_LED[sector];
+  }
+  if (led !== lastLed) {
+    leds.forEach((el, i) => el.classList.toggle('on', i === led));
+    lastLed = led;
+  }
+  const f = (v) => (v >= 0 ? '+' : '-') + Math.abs(v).toFixed(2);
+  $('valX').textContent = 'X ' + f(out.x);
+  $('valY').textContent = 'Y ' + f(out.y);
+  $('powerBar').style.width = (out.m * 100).toFixed(0) + '%';
+}
+
+/* =========================================================================
+   Pulsanti
+   ========================================================================= */
+function resetView() {
+  view.homing = geoToView(HOME.lat, HOME.lon);
+  view.zoomTarget = 1;
+}
+function toggleMode() {
+  view.mode = view.mode === 'fly' ? 'drag' : 'fly';
+  $('modeLabel').textContent = view.mode === 'fly' ? 'VOLA' : 'RUOTA';
+}
+$('btnReset').addEventListener('click', resetView);
+$('btnMode').addEventListener('click', toggleMode);
+
+/* =========================================================================
+   Satelliti: elementi orbitali (TLE) da CelesTrak, posizioni calcolate qui
+   con SGP4 (satellite.js). Le posizioni si ricalcolano ogni 10 minuti; i TLE
+   si riscaricano al massimo ogni 2 ore (CelesTrak li aggiorna con quel ritmo
+   e blocca chi scarica lo stesso gruppo più spesso), con cache nel browser.
+   ========================================================================= */
+const GROUPS = {
+  visual: 'Più luminosi',
+  stations: 'Stazioni spaziali',
+  weather: 'Meteo',
+  'gps-ops': 'GPS',
+  galileo: 'Galileo',
+  geo: 'Geostazionari',
+  starlink: 'Starlink',
+};
+const POSITION_REFRESH_MS = 10 * 60 * 1000;
+const TLE_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+const ORBIT_SAMPLES = 180;
+const ALL_ORBITS_MAX = 300;   // oltre, l'orbita si disegna solo per il satellite selezionato
+const MU = 398600.4418, R_EQ = 6378.137;
+
+const sats = {
+  group: null, list: [], selected: null, refreshedAt: 0, tleAt: 0, busy: false, error: '',
+  observer: null,   // { lat, lon, source, accuracy } dopo "SOPRA DI ME"
+  overhead: [],     // [{ s, el, az, range }] satelliti sopra l'orizzonte dell'osservatore
+};
+
+function dotTexture(ring) {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  x.beginPath(); x.arc(32, 32, ring ? 25 : 28, 0, Math.PI * 2);
+  if (ring) { x.lineWidth = 6; x.strokeStyle = '#fff'; x.stroke(); } else { x.fillStyle = '#fff'; x.fill(); }
+  return new THREE.CanvasTexture(c);
+}
+// Iconcina del satellite: corpo dorato e due pannelli solari, leggermente inclinata.
+function satIconTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  x.translate(32, 32); x.rotate(-0.55);
+  x.lineWidth = 2;
+  for (const side of [-1, 1]) {
+    const px = side < 0 ? -30 : 10;
+    x.fillStyle = '#2f6fe0'; x.strokeStyle = '#9cc4ff';
+    x.fillRect(px, -9, 20, 18); x.strokeRect(px, -9, 20, 18);
+    x.beginPath();
+    x.moveTo(px + 10, -9); x.lineTo(px + 10, 9);
+    x.moveTo(px, 0); x.lineTo(px + 20, 0);
+    x.stroke();
+  }
+  x.fillStyle = '#ffc23a'; x.strokeStyle = '#fff3c4';
+  x.fillRect(-9, -12, 18, 24); x.strokeRect(-9, -12, 18, 24);
+  x.beginPath(); x.moveTo(0, -12); x.lineTo(0, -19); x.stroke();
+  x.beginPath(); x.arc(0, -21, 3, 0, Math.PI * 2); x.fillStyle = '#fff3c4'; x.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+// Iconcina delle stazioni spaziali: traliccio con quattro coppie di pannelli e moduli al centro.
+function stationIconTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const x = c.getContext('2d');
+  x.translate(32, 32); x.rotate(-0.35);
+  x.strokeStyle = '#d8dde6'; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(-29, 0); x.lineTo(29, 0); x.stroke();
+  x.lineWidth = 1.5;
+  for (const px of [-28, -19, 12, 21]) {
+    for (const py of [-23, 3]) {
+      x.fillStyle = '#e0a43a'; x.strokeStyle = '#ffe2a0';
+      x.fillRect(px, py, 7, 20); x.strokeRect(px, py, 7, 20);
+      x.beginPath(); x.moveTo(px + 3.5, py); x.lineTo(px + 3.5, py + 20); x.stroke();
+    }
+  }
+  x.fillStyle = '#f2f4f8'; x.strokeStyle = '#8f99aa'; x.lineWidth = 2;
+  x.fillRect(-10, -4, 20, 8); x.strokeRect(-10, -4, 20, 8);
+  x.fillRect(-4, -13, 8, 26); x.strokeRect(-4, -13, 8, 26);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const STATION_RE = /^(ISS|CSS)\b|TIANGONG|TIANHE/i;
+function pointsLayer(opts) {
+  const p = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({
+    sizeAttenuation: false, transparent: true, depthWrite: false, ...opts,
+  }));
+  p.frustumCulled = false;
+  satellitesLayer.add(p);
+  return p;
+}
+const orbitDots = pointsLayer({ size: 2, color: 0x6fb8ff, opacity: 0.35 });
+const selOrbitDots = pointsLayer({ size: 3.5, color: 0x39ff7a, opacity: 0.95 });
+const satDots = pointsLayer({ size: 24, map: satIconTexture(), alphaTest: 0.1 });
+const stationDots = pointsLayer({ size: 38, map: stationIconTexture(), alphaTest: 0.1 });
+const overheadRings = pointsLayer({ size: 36, color: 0x4fe3ff, map: dotTexture(true), opacity: 0.85 });
+const selRing = pointsLayer({ size: 42, color: 0x39ff7a, map: dotTexture(true) });
+const setPositions = (points, arr) => points.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+
+// Terra-fissa (ECF, km) -> scena: x verso lon 0, y verso il polo nord, est verso -z.
+const ecfToScene = (p, out) => out.set(p.x, p.z, -p.y).divideScalar(EARTH_RADIUS_KM);
+
+function propagate(satrec, date) {
+  const pv = sat.propagate(satrec, date);
+  if (!pv || !pv.position || typeof pv.position !== 'object' || !Number.isFinite(pv.position.x)) return null;
+  return pv;
+}
+
+function parseTle(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    const l1 = lines[i], l2 = lines[i + 1];
+    if (!l1.startsWith('1 ') || !l2.startsWith('2 ')) continue;
+    const name = i > 0 && !lines[i - 1].startsWith('2 ') ? lines[i - 1].trim() : 'NORAD ' + l1.slice(2, 7).trim();
+    try {
+      out.push({
+        name, id: parseInt(l1.slice(2, 7), 10), cospar: cosparFromTle(l1), epoch: epochFromTle(l1),
+        isStation: STATION_RE.test(name),
+        satrec: sat.twoline2satrec(l1, l2),
+        pos: new THREE.Vector3(), ok: false, lat: 0, lon: 0, alt: 0, speed: 0,
+      });
+    } catch { /* TLE malformato: lo salto */ }
+    i++;
+  }
+  return out;
+}
+function cosparFromTle(l1) {
+  const s = l1.slice(9, 17).trim();            // es. "98067A" -> "1998-067A"
+  if (s.length < 5) return '';
+  const yy = +s.slice(0, 2);
+  return (yy < 57 ? 2000 + yy : 1900 + yy) + '-' + s.slice(2);
+}
+function epochFromTle(l1) {
+  const yy = +l1.slice(18, 20), doy = parseFloat(l1.slice(20, 32));
+  return new Date(Date.UTC(yy < 57 ? 2000 + yy : 1900 + yy, 0, 1) + (doy - 1) * 86400000);
+}
+
+async function fetchTle(group) {
+  const key = 'tle:' + group;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(key)); } catch { /* storage non disponibile */ }
+  if (cached && Date.now() - cached.t < TLE_MAX_AGE_MS) return cached;
+  try {
+    const res = await fetch(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${encodeURIComponent(group)}&FORMAT=tle`);
+    const text = await res.text();
+    if (!res.ok || !/\n1 /.test(text)) throw new Error(text.slice(0, 120) || 'HTTP ' + res.status);
+    const data = { t: Date.now(), text };
+    try { localStorage.setItem(key, JSON.stringify(data)); } catch { /* cache piena: pazienza */ }
+    return data;
+  } catch (err) {
+    if (cached) return cached;   // meglio dati di qualche ora fa che niente
+    throw err;
+  }
+}
+
+// Orbita "fotografata" adesso: punti lungo un periodo, tutti ruotati con il GMST
+// attuale, così l'ellisse è chiusa e il satellite ci sta sopra.
+function orbitBuffer(list, now, gmst) {
+  const out = new Float32Array(list.length * ORBIT_SAMPLES * 3), v = new THREE.Vector3();
+  let k = 0;
+  for (const s of list) {
+    const periodMs = 2 * Math.PI / s.satrec.no * 60000;
+    for (let j = 0; j < ORBIT_SAMPLES; j++) {
+      const pv = propagate(s.satrec, new Date(now.getTime() + j / ORBIT_SAMPLES * periodMs));
+      if (!pv) continue;
+      ecfToScene(sat.eciToEcf(pv.position, gmst), v);
+      out[k++] = v.x; out[k++] = v.y; out[k++] = v.z;
+    }
+  }
+  return out.subarray(0, k);
+}
+
+function refreshPositions() {
+  const now = new Date(), gmst = sat.gstime(now);
+  const arr = [], stationArr = [];
+  sats.list.forEach((s) => {
+    const pv = propagate(s.satrec, now);
+    s.ok = !!pv;
+    if (pv) {
+      s.ecf = sat.eciToEcf(pv.position, gmst);
+      ecfToScene(s.ecf, s.pos);
+      const geo = sat.eciToGeodetic(pv.position, gmst);
+      s.lat = geo.latitude / DEG; s.lon = wrapPi(geo.longitude) / DEG; s.alt = geo.height;
+      s.speed = Math.hypot(pv.velocity.x, pv.velocity.y, pv.velocity.z);
+    } else {
+      s.pos.set(0, 0, 0);   // decaduto o non propagabile: resta nascosto dentro la Terra
+    }
+    (s.isStation ? stationArr : arr).push(s.pos.x, s.pos.y, s.pos.z);
+  });
+  setPositions(satDots, new Float32Array(arr));
+  setPositions(stationDots, new Float32Array(stationArr));
+  satDots.material.size = sats.list.length > 1000 ? 12 : 24;   // con migliaia di satelliti (Starlink) icone più piccole
+  const live = sats.list.filter((s) => s.ok);
+  setPositions(orbitDots, live.length <= ALL_ORBITS_MAX ? orbitBuffer(live, now, gmst) : new Float32Array(0));
+  sats.refreshedAt = now.getTime();
+  updateSelection();
+  updateOverhead();
+}
+
+async function loadGroup(group) {
+  sats.group = group;
+  sats.list = [];
+  sats.error = '';
+  selectSat(null);
+  setPositions(satDots, new Float32Array(0));
+  setPositions(stationDots, new Float32Array(0));
+  setPositions(orbitDots, new Float32Array(0));
+  setPositions(overheadRings, new Float32Array(0));
+  try { localStorage.setItem('group', group); } catch { /* ok */ }
+  updateSatInfo();
+  try {
+    const data = await fetchTle(group);
+    if (sats.group !== group) return;   // nel frattempo è stato scelto un altro gruppo
+    sats.list = parseTle(data.text);
+    sats.tleAt = data.t;
+    refreshPositions();
+    fitZoomToGroup();
+  } catch (err) {
+    console.error(err);
+    sats.error = 'DATI NON DISPONIBILI';
+  }
+  updateSatInfo();
+}
+
+// Allarga la vista se il gruppo ha orbite alte (GPS, geostazionari).
+function fitZoomToGroup() {
+  const radii = sats.list.filter((s) => s.ok).map((s) => s.pos.length()).sort((a, b) => a - b);
+  if (!radii.length) return;
+  const r = radii[Math.floor(radii.length * 0.95)];
+  view.zoomTarget = r > 1.6 ? Math.max(0.12, 0.85 / r) : Math.max(view.zoom, 0.8);
+}
+
+async function tick() {
+  if (sats.list.length && !sats.busy && Date.now() - sats.refreshedAt >= POSITION_REFRESH_MS) {
+    sats.busy = true;
+    try {
+      if (Date.now() - sats.tleAt >= TLE_MAX_AGE_MS) {
+        const group = sats.group;
+        const data = await fetchTle(group).catch(() => null);
+        if (data && data.t !== sats.tleAt && sats.group === group) {
+          const selId = sats.selected?.id;
+          sats.list = parseTle(data.text);
+          sats.tleAt = data.t;
+          sats.selected = sats.list.find((s) => s.id === selId) || null;
+          if (!sats.selected) closeCard();
+        }
+      }
+      refreshPositions();
+    } finally {
+      sats.busy = false;
+    }
+  }
+  updateSatInfo();
+}
+setInterval(tick, 1000);
+
+const hhmm = (t) => new Date(t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+function updateSatInfo() {
+  let s;
+  if (sats.error) s = sats.error;
+  else if (!sats.list.length) s = 'CARICO SATELLITI…';
+  else {
+    const left = Math.max(0, POSITION_REFRESH_MS - (Date.now() - sats.refreshedAt)) / 1000;
+    const mm = Math.floor(left / 60), ss = String(Math.floor(left % 60)).padStart(2, '0');
+    s = `${sats.list.filter((x) => x.ok).length} SAT · AGG ${hhmm(sats.refreshedAt)} · ⟳ ${mm}:${ss}`;
+  }
+  $('satinfo').textContent = s;
+}
+
+/* ---------- Selezione con clic/tocco ---------- */
+const tmpW = new THREE.Vector3();
+function hiddenBehindEarth(p) {
+  // Il segmento camera -> punto attraversa la sfera terrestre (raggio 1, centro nell'origine)?
+  const o = camera.position;
+  const d = tmpW.copy(p).sub(o), len = d.length();
+  d.divideScalar(len);
+  const b = o.dot(d), c = o.lengthSq() - 1, disc = b * b - c;
+  if (disc < 0) return false;
+  const t = -b - Math.sqrt(disc);
+  return t > 0 && t < len - 1e-4;
+}
+function pickSatellite(cx, cy, radiusPx) {
+  satellitesLayer.updateMatrixWorld();
+  const m = satellitesLayer.matrixWorld, p = new THREE.Vector3();
+  let best = null, bestD = radiusPx;
+  for (const s of sats.list) {
+    if (!s.ok) continue;
+    p.copy(s.pos).applyMatrix4(m);
+    if (hiddenBehindEarth(p)) continue;
+    p.project(camera);
+    if (p.z > 1) continue;
+    const d = Math.hypot((p.x + 1) / 2 * window.innerWidth - cx, (1 - p.y) / 2 * window.innerHeight - cy);
+    if (d < bestD) { bestD = d; best = s; }
+  }
+  return best;
+}
+
+function selectSat(s) {
+  sats.selected = s;
+  updateSelection();
+  if (s) openCard(s); else closeCard();
+}
+function updateSelection() {
+  const s = sats.selected;
+  selRing.visible = selOrbitDots.visible = !!(s && s.ok);
+  if (!selRing.visible) return;
+  setPositions(selRing, new Float32Array([s.pos.x, s.pos.y, s.pos.z]));
+  const t = new Date(sats.refreshedAt);
+  setPositions(selOrbitDots, orbitBuffer([s], t, sat.gstime(t)));
+  renderCardLive();
+}
+
+/* ---------- Schedina ---------- */
+const card = $('card');
+const OBJECT_TYPE = { PAY: 'Satellite', 'R/B': 'Stadio di razzo', DEB: 'Detrito', UNK: 'Sconosciuto' };
+const OPS_STATUS = {
+  '+': 'Operativo', '-': 'Non operativo', P: 'Parzialmente operativo', B: 'Riserva', S: 'Scorta',
+  X: 'Missione estesa', D: 'Rientrato', '?': 'Sconosciuto',
+};
+const OWNERS = {
+  US: 'Stati Uniti', PRC: 'Cina', CIS: 'Russia / ex URSS', ESA: 'ESA', JPN: 'Giappone', IND: 'India',
+  FR: 'Francia', UK: 'Regno Unito', GER: 'Germania', IT: 'Italia', ISS: 'ISS (internazionale)',
+  CA: 'Canada', SKOR: 'Corea del Sud', ISRA: 'Israele', BRAZ: 'Brasile', EUME: 'EUMETSAT',
+  EUTE: 'Eutelsat', ITSO: 'Intelsat', SES: 'SES', IRID: 'Iridium', GLOB: 'Globalstar', ORB: 'Orbcomm',
+};
+const SITES = {
+  AFETR: 'Cape Canaveral', AFWTR: 'Vandenberg', TYMSC: 'Baikonur', PLMSC: 'Plesetsk', VOSTO: 'Vostochny',
+  KYMSC: 'Kapustin Yar', FRGUI: 'Kourou', JSC: 'Jiuquan', TSC: 'Taiyuan', XSC: 'Xichang', WSC: 'Wenchang',
+  SRILR: 'Sriharikota', TNSTA: 'Tanegashima', KSCUT: 'Uchinoura', WLPIS: 'Wallops', RLLB: 'Mahia (Rocket Lab)',
+  SEAL: 'Sea Launch', YAVNE: 'Palmachim', NSC: 'Naro',
+};
+const fmt = (v, d = 0) => v.toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+function renderRows(dl, rows) {
+  dl.replaceChildren(...rows.flatMap(([k, v]) => {
+    const dt = document.createElement('dt'), dd = document.createElement('dd');
+    dt.textContent = k; dd.textContent = v;
+    return [dt, dd];
+  }));
+}
+function renderCardLive() {
+  const s = sats.selected;
+  if (!s || card.hidden || card.dataset.mode !== 'sat') return;
+  const r = s.satrec, n = r.no / 60, a = Math.cbrt(MU / (n * n));
+  const ageH = (sats.refreshedAt - s.epoch) / 3600000;
+  renderRows($('cardLive'), s.ok ? [
+    ['Quota', fmt(s.alt) + ' km'],
+    ['Velocità', fmt(s.speed, 2) + ' km/s'],
+    ['Posizione', `${fmt(Math.abs(s.lat), 1)}°${s.lat >= 0 ? 'N' : 'S'} ${fmt(Math.abs(s.lon), 1)}°${s.lon >= 0 ? 'E' : 'W'}`],
+    ['Inclinazione', fmt(r.inclo / DEG, 1) + '°'],
+    ['Periodo', fmt(2 * Math.PI / r.no, 1) + ' min'],
+    ['Apogeo / perigeo', `${fmt(a * (1 + r.ecco) - R_EQ)} / ${fmt(a * (1 - r.ecco) - R_EQ)} km`],
+    ['Dati orbitali', ageH < 48 ? `di ${fmt(ageH)} h fa` : `di ${fmt(ageH / 24)} giorni fa`],
+    ['Posizione al', hhmm(sats.refreshedAt)],
+  ] : [['Stato', 'posizione non calcolabile']]);
+}
+// La schedina ha due modalità: 'sat' (un satellite) e 'overhead' (elenco "sopra di me").
+function setCardMode(mode) {
+  card.dataset.mode = mode;
+  card.hidden = false;
+  for (const id of ['cardLive', 'cardInfo', 'cardN2yo']) $(id).hidden = mode !== 'sat';
+  $('cardList').hidden = mode !== 'overhead';
+  $('cardImg').hidden = $('cardImgCredit').hidden = $('cardDesc').hidden = $('cardWiki').hidden = true;
+  card.scrollTop = 0;
+}
+function openCard(s) {
+  setCardMode('sat');
+  $('cardTitle').textContent = s.name;
+  $('cardSub').textContent = `NORAD ${s.id}` + (s.cospar ? ` · ${s.cospar}` : '');
+  $('cardN2yo').href = `https://www.n2yo.com/satellite/?s=${s.id}`;
+  $('cardImg').removeAttribute('src');
+  renderCardLive();
+  renderRows($('cardInfo'), [['Catalogo', 'carico…']]);
+  loadDetails(s);
+}
+function closeCard() { card.hidden = true; }
+$('cardClose').addEventListener('click', () => selectSat(null));
+$('cardCenter').addEventListener('click', () => {
+  const s = sats.selected, o = sats.observer;
+  if (card.dataset.mode === 'overhead' && o) view.homing = geoToView(o.lat, o.lon);
+  else if (s && s.ok) view.homing = geoToView(s.lat, s.lon);
+});
+
+const satcatCache = new Map(), wikiCache = new Map();
+function getSatcat(id) {
+  if (!satcatCache.has(id)) {
+    satcatCache.set(id, fetch(`https://celestrak.org/satcat/records.php?CATNR=${id}&FORMAT=json`)
+      .then((r) => r.json()).then((a) => a[0] || null).catch(() => null));
+  }
+  return satcatCache.get(id);
+}
+function getWiki(id) {
+  if (!wikiCache.has(id)) {
+    // Più voci possono condividere il numero NORAD (es. ISS e il modulo Zarja): vince la più citata.
+    const q = `SELECT ?item ?itemLabel ?itemDescription ?image ?article WHERE {
+      ?item wdt:P377 "${id}"; wikibase:sitelinks ?links.
+      OPTIONAL { ?item wdt:P18 ?image }
+      OPTIONAL { ?article schema:about ?item; schema:isPartOf <https://it.wikipedia.org/> }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
+    } ORDER BY DESC(?links) LIMIT 1`;
+    wikiCache.set(id, fetch('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q))
+      .then((r) => r.json()).then((j) => {
+        const b = j.results.bindings[0];
+        if (!b) return null;
+        return {
+          label: b.itemLabel?.value, description: b.itemDescription?.value,
+          image: b.image?.value.replace(/^http:/, 'https:'),
+          url: b.article?.value || b.item?.value,
+        };
+      }).catch(() => null));
+  }
+  return wikiCache.get(id);
+}
+async function loadDetails(s) {
+  const [cat, wiki] = await Promise.all([getSatcat(s.id), getWiki(s.id)]);
+  if (sats.selected !== s || card.dataset.mode !== 'sat') return;
+  renderRows($('cardInfo'), cat ? [
+    ['Tipo', OBJECT_TYPE[cat.OBJECT_TYPE] || cat.OBJECT_TYPE || '—'],
+    ['Stato', OPS_STATUS[cat.OPS_STATUS_CODE] || '—'],
+    ['Proprietario', OWNERS[cat.OWNER] || cat.OWNER || '—'],
+    ['Lancio', cat.LAUNCH_DATE ? new Date(cat.LAUNCH_DATE).toLocaleDateString('it-IT') : '—'],
+    ['Base di lancio', SITES[cat.LAUNCH_SITE] || cat.LAUNCH_SITE || '—'],
+    ...(cat.DECAY_DATE ? [['Rientro', new Date(cat.DECAY_DATE).toLocaleDateString('it-IT')]] : []),
+  ] : [['Catalogo', 'non disponibile']]);
+  if (wiki) {
+    const desc = [wiki.label !== s.name ? wiki.label : '', wiki.description].filter(Boolean).join(' — ');
+    $('cardDesc').textContent = desc;
+    $('cardDesc').hidden = !desc;
+    if (wiki.url) { $('cardWiki').href = wiki.url; $('cardWiki').hidden = false; }
+    if (wiki.image) {
+      // Le foto di Commons hanno licenze diverse (spesso CC BY-SA): il link porta alla
+      // pagina del file con autore e licenza.
+      const img = $('cardImg'), credit = $('cardImgCredit');
+      img.onerror = () => { img.hidden = credit.hidden = true; };
+      img.src = wiki.image + '?width=480';
+      credit.href = wiki.image.replace('/wiki/Special:FilePath/', '/wiki/File:');
+      img.hidden = credit.hidden = false;
+    }
+  }
+}
+
+/* ---------- Sopra di me ----------
+   Posizione precisa dal browser (serve https, oppure il file aperto dal PC);
+   se non c'è, su richiesta una posizione approssimativa dall'indirizzo IP. */
+const MIN_ELEVATION = 10;   // gradi sopra l'orizzonte
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
+let observerMarker = null;
+
+function preciseLocation() {
+  return new Promise((resolve, reject) => {
+    if (!window.isSecureContext || !navigator.geolocation) {
+      reject(new Error('il browser la concede solo alle pagine https o al file aperto dal PC'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, source: 'GPS', accuracy: p.coords.accuracy }),
+      (err) => reject(new Error(err.code === 1 ? 'permesso negato' : err.code === 3 ? 'tempo scaduto' : 'non disponibile')),
+      { timeout: 15000, maximumAge: 10 * 60 * 1000 },
+    );
+  });
+}
+async function approxLocation() {
+  const j = await (await fetch('https://get.geojs.io/v1/ip/geo.json')).json();
+  return { lat: +j.latitude, lon: +j.longitude, source: 'rete', city: j.city };
+}
+
+function updateOverhead() {
+  const o = sats.observer;
+  if (!o) return;
+  const gd = { latitude: o.lat * DEG, longitude: o.lon * DEG, height: 0.1 };
+  sats.overhead = sats.list
+    .filter((s) => s.ok)
+    .map((s) => {
+      const la = sat.ecfToLookAngles(gd, s.ecf);
+      return { s, el: la.elevation / DEG, az: la.azimuth / DEG, range: la.rangeSat };
+    })
+    .filter((x) => x.el >= MIN_ELEVATION)
+    .sort((a, b) => b.el - a.el);
+  setPositions(overheadRings, new Float32Array(sats.overhead.flatMap(({ s }) => [s.pos.x, s.pos.y, s.pos.z])));
+  if (!card.hidden && card.dataset.mode === 'overhead') renderOverheadCard();
+}
+
+function renderOverheadCard(message, offerApprox) {
+  setCardMode('overhead');
+  const o = sats.observer, list = $('cardList');
+  $('cardTitle').textContent = 'SOPRA DI TE';
+  const p = (text) => { const el = document.createElement('p'); el.textContent = text; return el; };
+  if (!o) {
+    $('cardSub').textContent = '';
+    list.replaceChildren(p(message || 'Cerco la tua posizione…'));
+    if (offerApprox) {
+      const b = document.createElement('button');
+      b.className = 'pill';
+      b.textContent = 'USA POSIZIONE APPROSSIMATIVA';
+      b.addEventListener('click', async () => {
+        renderOverheadCard('Chiedo una posizione approssimativa alla rete…');
+        try { setObserver(await approxLocation()); } catch { renderOverheadCard('Posizione approssimativa non disponibile.'); }
+      });
+      list.append(p('Posso usare una posizione approssimativa ricavata dalla connessione (di solito la città).'), b);
+    }
+    return;
+  }
+  const where = `${fmt(Math.abs(o.lat), 2)}°${o.lat >= 0 ? 'N' : 'S'} ${fmt(Math.abs(o.lon), 2)}°${o.lon >= 0 ? 'E' : 'W'}`;
+  const how = o.source === 'GPS' ? `GPS ±${fmt(o.accuracy)} m` : `dalla rete${o.city ? ' · ' + o.city : ''}`;
+  $('cardSub').textContent = `${where} · ${how}`;
+  const head = sats.overhead.length
+    ? `${sats.overhead.length} satelliti del gruppo «${GROUPS[sats.group]}» sono più alti di ${MIN_ELEVATION}° sull'orizzonte (posizioni delle ${hhmm(sats.refreshedAt)}). Tocca un nome per la scheda.`
+    : `Nessun satellite del gruppo «${GROUPS[sats.group]}» è più alto di ${MIN_ELEVATION}° sull'orizzonte adesso. Prova un altro gruppo, per esempio Starlink.`;
+  list.replaceChildren(p(head), ...sats.overhead.map(({ s, el, az, range }) => {
+    const b = document.createElement('button');
+    b.className = 'sat-row';
+    const name = document.createElement('span'), info = document.createElement('span');
+    name.textContent = s.name;
+    info.textContent = `${fmt(el)}° ${COMPASS[Math.round(az / 45) % 8]} · ${fmt(range)} km`;
+    b.append(name, info);
+    b.addEventListener('click', () => selectSat(s));
+    return b;
+  }));
+}
+
+function setObserver(o) {
+  sats.observer = o;
+  if (!observerMarker) observerMarker = addMarker(o.lat, o.lon, { color: 0x4fe3ff, size: 0.02 });
+  else latLonToVector3(o.lat, o.lon, 0, observerMarker.position);
+  view.homing = geoToView(o.lat, o.lon);
+  view.zoomTarget = 1.5;
+  updateOverhead();
+  renderOverheadCard();
+}
+
+$('btnOverhead').addEventListener('click', async () => {
+  sats.selected = null;
+  updateSelection();
+  if (sats.observer) { setObserver(sats.observer); return; }
+  renderOverheadCard();
+  try {
+    setObserver(await preciseLocation());
+  } catch (err) {
+    renderOverheadCard(`Posizione precisa non disponibile: ${err.message}.`, true);
+  }
+});
+
+// Menu dei gruppi
+{
+  const sel = $('group');
+  for (const [k, label] of Object.entries(GROUPS)) sel.add(new Option(label.toUpperCase(), k));
+  let saved = null;
+  try { saved = localStorage.getItem('group'); } catch { /* ok */ }
+  sel.value = GROUPS[saved] ? saved : 'visual';
+  sel.addEventListener('change', () => { sel.blur(); loadGroup(sel.value); });
+  loadGroup(sel.value);
+}
+
+/* =========================================================================
+   Loop
+   ========================================================================= */
+const coordsEl = $('coords');
+let lastCoords = '';
+function updateCoords() {
+  const lat = view.tilt / DEG;
+  const lon = wrapPi(-view.spin - Math.PI / 2) / DEG;
+  const s = `LAT ${Math.abs(lat).toFixed(1).padStart(4, '0')}°${lat >= 0 ? 'N' : 'S'}  ` +
+            `LON ${Math.abs(lon).toFixed(1).padStart(5, '0')}°${lon >= 0 ? 'E' : 'W'}`;
+  if (s !== lastCoords) { coordsEl.textContent = s; lastCoords = s; }
+}
+
+let prev = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - prev) / 1000);
+  prev = now;
+
+  updateJoystick(dt);
+  if (joy.dirty) { drawStick(); joy.dirty = false; }
+  const out = stickOutput();
+  updateIndicator(out);
+
+  // Velocità proporzionale alla spinta, con un po' di inerzia.
+  const sign = view.mode === 'fly' ? 1 : -1;
+  const ease = 1 - Math.exp(-dt * 6);
+  view.vSpin += (-out.x * MAX_SPIN * sign - view.vSpin) * ease;
+  view.vTilt += (out.y * MAX_TILT * sign - view.vTilt) * ease;
+
+  if (out.m > 0) view.homing = null;
+  const k = 1 - Math.exp(-dt * 4);
+  if (view.zoomTarget !== null) {
+    setZoom(view.zoom + (view.zoomTarget - view.zoom) * k);
+    if (Math.abs(view.zoomTarget - view.zoom) < 1e-3) view.zoomTarget = null;
+  }
+  if (view.homing) {
+    view.spin += wrapPi(view.homing.spin - view.spin) * k;
+    view.tilt += (view.homing.tilt - view.tilt) * k;
+    view.vSpin = view.vTilt = 0;
+    if (Math.abs(wrapPi(view.homing.spin - view.spin)) < 1e-3 && Math.abs(view.homing.tilt - view.tilt) < 1e-3) view.homing = null;
+  } else {
+    view.spin = wrapPi(view.spin + view.vSpin * dt);
+    view.tilt += view.vTilt * dt;
+    if (Math.abs(view.tilt) > TILT_LIMIT) { view.tilt = Math.sign(view.tilt) * TILT_LIMIT; view.vTilt = 0; }
+  }
+
+  earthPivot.rotation.set(view.tilt, view.spin, 0);
+  updateCoords();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// Comodo per esperimenti dalla console del browser, es.:
+//   globeApp.addMarker(45.07, 7.69, { color: 0x39ff7a })   // Torino
+//   globeApp.addMarker(0, -30, { altKm: 420 })             // "satellite" a 420 km
+window.globeApp = { THREE, scene, camera, earthPivot, satellitesLayer, latLonToVector3, addMarker, view, joy, sats, selectSat, refreshPositions, setObserver };
+</script>
+</body>
+</html>
