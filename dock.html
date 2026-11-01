@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#05060a">
+<title>Attracco ISS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05060a;
+    --ink: #e8e6df;
+    --dim: #7c7c88;
+    --red: #ff2a2a;
+    --amber: #ffb000;
+    --green: #39ff7a;
+    --cyan: #4fe3ff;
+    --stick: clamp(130px, min(36vw, 30vh), 220px);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, Consolas, monospace;
+  }
+  body {
+    -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* HUD: titolo e telemetria */
+  .hud {
+    position: fixed; pointer-events: none;
+    top: calc(14px + env(safe-area-inset-top)); left: calc(16px + env(safe-area-inset-left));
+  }
+  .title { font-size: 14px; letter-spacing: 2px; color: var(--amber); text-shadow: 0 0 8px rgba(255,176,0,.55); }
+  .title span { color: var(--red); }
+  .sub { margin-top: 8px; font-size: 7px; color: var(--dim); }
+  .back {
+    pointer-events: auto; display: inline-block; margin-top: 10px; padding: 7px 10px; border-radius: 999px;
+    font-size: 7px; color: var(--ink); text-decoration: none; border: 1px solid #3a3a44; background: #16161c;
+  }
+  .back:hover { border-color: var(--amber); color: var(--amber); }
+  .tele {
+    position: fixed; pointer-events: none; text-align: right;
+    top: calc(14px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
+    display: grid; grid-template-columns: auto auto; gap: 7px 12px; font-size: 8px;
+    padding: 12px 14px; border-radius: 12px; background: rgba(8,9,12,.72); border: 1px solid #22222a;
+  }
+  .tele dt { color: var(--dim); }
+  .tele dd { margin: 0; color: var(--green); min-width: 9ch; }
+  .tele dd.warn { color: var(--amber); }
+  .tele dd.bad { color: var(--red); }
+  .fuel { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: #1b1b22; overflow: hidden; }
+  #fuelBar { height: 100%; width: 100%; background: linear-gradient(90deg, var(--red), var(--amber) 30%, var(--green) 60%); }
+
+  /* Mirino al centro (asse della navetta) e segno del portello */
+  .reticle { position: fixed; left: 50%; top: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; pointer-events: none; }
+  .port-mark {
+    position: fixed; width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: none;
+    border: 2px solid var(--cyan); transform: rotate(45deg); box-shadow: 0 0 8px rgba(79,227,255,.6);
+  }
+  .msg {
+    position: fixed; left: 50%; top: calc(50% + 62px); transform: translateX(-50%); pointer-events: none;
+    font-size: 10px; color: var(--amber); text-shadow: 0 0 8px rgba(255,176,0,.6); white-space: nowrap;
+  }
+
+  /* Schermate di inizio e fine */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 16px;
+    background: radial-gradient(ellipse at center, rgba(5,6,10,.55), rgba(5,6,10,.9));
+  }
+  .panel {
+    width: min(520px, 100%); max-height: 100%; overflow-y: auto; padding: 22px; border-radius: 16px;
+    background: rgba(12,12,16,.96); border: 1px solid #2a2a33; box-shadow: 0 12px 40px rgba(0,0,0,.6);
+  }
+  .panel h1 { margin: 0; font-size: 14px; line-height: 1.6; color: var(--amber); }
+  .panel p { margin: 12px 0 0; font: 14px/1.5 system-ui, sans-serif; color: #c9c7c0; }
+  .panel kbd { font: 12px ui-monospace, Consolas, monospace; padding: 1px 5px; border: 1px solid #3a3a44; border-radius: 4px; }
+  .levels { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .level {
+    padding: 12px 10px; border-radius: 10px; border: 1px solid #33333d; background: #15151b; color: var(--ink);
+    font: 8px/1.7 'Press Start 2P', monospace; text-align: left; cursor: pointer;
+  }
+  .level small { display: block; margin-top: 4px; font: 12px/1.4 system-ui, sans-serif; color: var(--dim); }
+  .level[aria-pressed="true"] { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 0 1px var(--amber) inset; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .big {
+    flex: 1 1 auto; padding: 14px 16px; border-radius: 12px; border: 0; cursor: pointer; text-align: center;
+    font: 10px 'Press Start 2P', monospace; color: #1a0f00; text-decoration: none;
+    background: linear-gradient(#ffd25a, #ff9d00); box-shadow: 0 4px 0 #8a5200, 0 6px 14px rgba(0,0,0,.5);
+  }
+  .big:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a5200; }
+  .big.secondary { color: var(--ink); background: #1c1c23; box-shadow: 0 4px 0 #0a0a0d; border: 1px solid #33333d; }
+  .result { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin-top: 14px; font: 13px ui-monospace, Consolas, monospace; }
+  .result dt { color: var(--dim); }
+  .result dd { margin: 0; text-align: right; }
+  .result .ok { color: var(--green); }
+  .result .ko { color: var(--red); }
+
+  /* Pannello comandi, come quello del globo */
+  .deck {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 16px;
+    padding: 22px 18px 18px;
+    background: linear-gradient(#18181e, #09090c);
+    border: 1px solid #2a2a33; border-radius: 18px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.06);
+    touch-action: none;
+  }
+  .deck::before {
+    content: ''; position: absolute; left: 18px; right: 18px; top: 0; height: 5px;
+    background: linear-gradient(90deg, var(--red) 0 33%, #ff7a00 33% 66%, #ffd000 66%);
+    border-radius: 0 0 4px 4px;
+  }
+  .deck::after { content: 'PILOT'; position: absolute; left: 22px; top: 10px; font-size: 6px; color: #4a4a55; letter-spacing: 1px; }
+  .lbl { font-size: 6px; color: var(--dim); text-align: center; }
+
+  /* Regolazioni: sensibilità (cursore) e movimento (ASSIST/MANUAL) */
+  .settings { display: flex; flex-direction: column; gap: 14px; width: 92px; }
+  .sens { display: flex; flex-direction: column; gap: 7px; }
+  .sens output { font-size: 8px; color: var(--green); text-align: center; }
+  .sens input { width: 100%; accent-color: var(--amber); cursor: pointer; }
+  .toggle {
+    padding: 8px 6px; border-radius: 8px; border: 1px solid #33333d; background: #101014; cursor: pointer;
+    font: 7px/1.6 'Press Start 2P', monospace; color: var(--dim);
+  }
+  .toggle b { display: block; font-weight: normal; color: var(--green); }
+  .toggle[aria-pressed="false"] b { color: var(--amber); }
+
+  #stick { width: var(--stick); height: var(--stick); display: block; touch-action: none; cursor: grab; }
+  #stick.grabbing { cursor: grabbing; }
+
+  /* Leva di spinta avanti/indietro, torna al centro */
+  .lever-wrap { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .lever {
+    position: relative; width: 38px; height: calc(var(--stick) - 22px); border-radius: 19px; touch-action: none; cursor: grab;
+    background: linear-gradient(90deg, #0a0a0d, #1d1d23 50%, #0a0a0d); border: 1px solid #2a2a33;
+  }
+  .lever::before { content: ''; position: absolute; left: 50%; top: 10px; bottom: 10px; width: 4px; margin-left: -2px; border-radius: 2px; background: #000; }
+  .lever::after { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 2px; background: rgba(255,176,0,.45); }
+  .knob {
+    position: absolute; left: 3px; right: 3px; height: 24px; top: 50%; margin-top: -12px; border-radius: 7px;
+    background: linear-gradient(#e8e8ec, #8a8a92); box-shadow: 0 3px 6px rgba(0,0,0,.6), inset 0 -3px 0 rgba(0,0,0,.25);
+  }
+
+  /* Rollio: due pulsanti arcade, si tengono premuti */
+  .rollpad { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+  .btn { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 6px; color: var(--dim); }
+  .arcade {
+    --c1: #a6f3ff; --c2: #19b6e0; --c3: #003a52;
+    width: 50px; height: 50px; border: 0; border-radius: 50%; padding: 0; cursor: pointer;
+    font: 16px/1 system-ui, sans-serif; color: rgba(0,0,0,.55);
+    background: radial-gradient(circle at 35% 30%, var(--c1), var(--c2) 45%, var(--c3));
+    box-shadow: 0 0 0 4px #040405, 0 5px 0 4px #040405, 0 8px 12px 4px rgba(0,0,0,.5), inset 0 -4px 6px rgba(0,0,0,.35);
+    transition: transform .06s, box-shadow .06s; touch-action: none;
+  }
+  .arcade.pressed {
+    transform: translateY(3px);
+    box-shadow: 0 0 0 4px #040405, 0 2px 0 4px #040405, 0 3px 6px 4px rgba(0,0,0,.5), inset 0 -2px 4px rgba(0,0,0,.35);
+  }
+
+  @media (max-aspect-ratio: 1/1) {
+    .deck { left: 0; right: 0; transform: none; bottom: 0; justify-content: space-evenly; gap: 4px;
+      padding: 22px 6px calc(14px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; border-bottom: 0; }
+    .settings { width: 70px; gap: 10px; }
+    .tele { font-size: 7px; padding: 10px; gap: 5px 8px; top: calc(96px + env(safe-area-inset-top)); }
+    .arcade { width: 42px; height: 42px; }
+    .lever { width: 32px; }
+  }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<header class="hud">
+  <div class="title">DOCK<span>·</span>ISS</div>
+  <div class="sub" id="issInfo"></div>
+  <a class="back" href="index.html" data-i18n="back">← GLOBO</a>
+</header>
+
+<dl class="tele" id="tele">
+  <dt data-i18n="tDist">DISTANZA</dt><dd id="tDist">—</dd>
+  <dt data-i18n="tSpeed">AVVICIN.</dt><dd id="tSpeed">—</dd>
+  <dt data-i18n="tLat">LATERALE</dt><dd id="tLat">—</dd>
+  <dt data-i18n="tRoll">ROLLIO Δ</dt><dd id="tRoll">—</dd>
+  <dt data-i18n="tRate">ROTAZ. Δ</dt><dd id="tRate">—</dd>
+  <dt data-i18n="tTime">TEMPO</dt><dd id="tTime">—</dd>
+  <dt data-i18n="tFuel">RCS</dt><dd id="tFuel">—</dd>
+  <div class="fuel"><div id="fuelBar"></div></div>
+</dl>
+
+<svg class="reticle" viewBox="-42 -42 84 84" aria-hidden="true">
+  <g fill="none" stroke="#39ff7a" stroke-width="1.6" opacity=".85">
+    <circle r="14"/>
+    <path d="M-40 0H-20M20 0H40M0 -40V-20M0 20V40"/>
+    <path d="M-30 -30l6 6M30 -30l-6 6M-30 30l6 -6M30 30l-6 -6" stroke-width="1"/>
+  </g>
+</svg>
+<div class="port-mark" id="portMark" hidden></div>
+<div class="msg" id="msg"></div>
+
+<div class="overlay" id="startScreen">
+  <div class="panel">
+    <h1 data-i18n="startTitle">ATTRACCO ALLA ISS</h1>
+    <p data-i18n-html="startText"></p>
+    <div class="levels" id="levels"></div>
+    <div class="actions">
+      <button class="big" id="btnStart" data-i18n="start">▶ INIZIA</button>
+      <a class="big secondary" href="index.html" data-i18n="back">← GLOBO</a>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="endScreen" hidden>
+  <div class="panel">
+    <h1 id="endTitle"></h1>
+    <p id="endText"></p>
+    <dl class="result" id="endResult"></dl>
+    <div class="actions">
+      <button class="big" id="btnRetry" data-i18n="retry">↻ RIPROVA</button>
+      <button class="big secondary" id="btnLevels" data-i18n="levelsBtn">LIVELLI</button>
+      <a class="big secondary" href="index.html" data-i18n="back">← GLOBO</a>
+    </div>
+  </div>
+</div>
+
+<section class="deck" id="deck">
+  <div class="settings">
+    <div class="sens">
+      <span class="lbl" data-i18n="sens">SENSIBILITÀ</span>
+      <input type="range" id="sens" min="0.25" max="2" step="0.05" data-i18n-aria="sens" aria-label="Sensibilità">
+      <output id="sensVal">1.00×</output>
+    </div>
+    <button class="toggle" id="btnAssist" aria-pressed="true"><span data-i18n="mode">MOVIMENTO</span><b id="assistVal">ASSIST</b></button>
+    <button class="toggle" id="btnInvert" aria-pressed="false"><span data-i18n="invert">ASSE Y</span><b id="invertVal">NORMALE</b></button>
+  </div>
+  <div class="lever-wrap">
+    <canvas id="stick" role="application" data-i18n-aria="stickAria" aria-label="Spostamento laterale"></canvas>
+    <span class="lbl" data-i18n="stickLbl">LATERALE</span>
+  </div>
+  <div class="lever-wrap">
+    <div class="lever" id="lever" role="slider" aria-valuemin="-1" aria-valuemax="1" data-i18n-aria="thrustAria" aria-label="Spinta"><div class="knob" id="knob"></div></div>
+    <span class="lbl" data-i18n="thrust">SPINTA</span>
+  </div>
+  <div class="rollpad">
+    <div class="btn"><button class="arcade" id="rollL" data-i18n-aria="rollL" aria-label="Rollio antiorario">↺</button>ROLL</div>
+    <div class="btn"><button class="arcade" id="rollR" data-i18n-aria="rollR" aria-label="Rollio orario">↻</button>ROLL</div>
+  </div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+
+const DEG = Math.PI / 180;
+const $ = (id) => document.getElementById(id);
+
+/* =========================================================================
+   Minigioco: attracco a una ISS che gira su sé stessa attorno all'asse del portello.
+   Per agganciarsi bisogna far ruotare la navetta alla stessa velocità (allora la stazione
+   sembra ferma e sono Terra e stelle a girare), centrarsi sull'asse e arrivare piano.
+   Riferimento: asse z uscente dal portello verso la navetta, x e y laterali, non rotanti.
+   ========================================================================= */
+
+// ---------------------------------------------------------------- lingua
+const STR = {
+  it: {
+    back: '← GLOBO', start: '▶ INIZIA', retry: '↻ RIPROVA', levelsBtn: 'LIVELLI', startTitle: 'ATTRACCO ALLA ISS',
+    startText: 'La stazione gira attorno all\'asse del portello. Fai ruotare la navetta alla stessa velocità con i pulsanti <b>ROLL</b> (<kbd>Q</kbd> <kbd>E</kbd>): quando la stazione ti sembra ferma sei sincronizzato. Poi centra il portello nel mirino con la <b>cloche</b> (frecce) e avvicinati piano con la <b>leva di spinta</b> (<kbd>W</kbd> <kbd>S</kbd>).<br>All\'aggancio servono: centro entro 25 cm, meno di 0,35 m/s, rollio entro 5° e rotazione entro 3°/s.',
+    sens: 'SENSIBILITÀ', mode: 'MOVIMENTO', invert: 'ASSE Y', invNormal: 'NORMALE', invInverted: 'INVERTITO',
+    stickLbl: 'LATERALE', thrust: 'SPINTA', stickAria: 'Spostamento laterale', thrustAria: 'Spinta avanti e indietro',
+    rollL: 'Rollio antiorario', rollR: 'Rollio orario',
+    tDist: 'DISTANZA', tSpeed: 'AVVICIN.', tLat: 'LATERALE', tRoll: 'ROLLIO Δ', tRate: 'ROTAZ. Δ', tTime: 'TEMPO', tFuel: 'RCS',
+    lvCalm: 'FERMA', lvCalmD: 'La stazione non gira: impara i comandi.',
+    lvSlow: 'LENTA', lvSlowD: '8°/s: un giro ogni 45 secondi.',
+    lvFast: 'VELOCE', lvFastD: '25°/s: serve sincronizzarsi bene.',
+    lvTumble: 'IN AVARIA', lvTumbleD: '60°/s: un giro ogni 6 secondi. Nessuna paura.',
+    mSlow: 'RALLENTA', mCenter: 'CENTRA IL PORTELLO', mRoll: 'SINCRONIZZA IL ROLLIO', mGood: 'TUTTO ALLINEATO', mNoFuel: 'RCS ESAURITO',
+    winTitle: 'AGGANCIATO!', winText: (lv) => `Attracco riuscito al livello ${lv}.`,
+    failTitle: 'ATTRACCO FALLITO', failCrash: 'Hai urtato il portello.', failLost: 'Ti sei allontanato troppo dalla stazione.',
+    rLat: 'Centro', rSpeed: 'Velocità', rRoll: 'Rollio', rRate: 'Rotazione', rTime: 'Tempo', rFuel: 'RCS rimasto', rScore: 'Punteggio',
+    issInfo: (alt, v) => `ISS · ${alt} KM · ${v} KM/S`,
+  },
+  en: {
+    back: '← GLOBE', start: '▶ START', retry: '↻ RETRY', levelsBtn: 'LEVELS', startTitle: 'DOCKING WITH THE ISS',
+    startText: 'The station spins around the axis of its docking port. Spin your ship at the same rate with the <b>ROLL</b> buttons (<kbd>Q</kbd> <kbd>E</kbd>): when the station looks still you are synchronized. Then center the port in the reticle with the <b>stick</b> (arrow keys) and close in slowly with the <b>thrust lever</b> (<kbd>W</kbd> <kbd>S</kbd>).<br>To latch you need: centered within 25 cm, under 0.35 m/s, roll within 5° and spin within 3°/s.',
+    sens: 'SENSITIVITY', mode: 'MOVEMENT', invert: 'Y AXIS', invNormal: 'NORMAL', invInverted: 'INVERTED',
+    stickLbl: 'LATERAL', thrust: 'THRUST', stickAria: 'Lateral translation', thrustAria: 'Forward and back thrust',
+    rollL: 'Roll counterclockwise', rollR: 'Roll clockwise',
+    tDist: 'RANGE', tSpeed: 'CLOSING', tLat: 'LATERAL', tRoll: 'ROLL Δ', tRate: 'SPIN Δ', tTime: 'TIME', tFuel: 'RCS',
+    lvCalm: 'STILL', lvCalmD: 'The station is not spinning: learn the controls.',
+    lvSlow: 'SLOW', lvSlowD: '8°/s: one turn every 45 seconds.',
+    lvFast: 'FAST', lvFastD: '25°/s: you need a good sync.',
+    lvTumble: 'TUMBLING', lvTumbleD: '60°/s: one turn every 6 seconds. No fear.',
+    mSlow: 'SLOW DOWN', mCenter: 'CENTER THE PORT', mRoll: 'MATCH THE ROLL', mGood: 'ALL ALIGNED', mNoFuel: 'RCS EMPTY',
+    winTitle: 'DOCKED!', winText: (lv) => `Docking complete at level ${lv}.`,
+    failTitle: 'DOCKING FAILED', failCrash: 'You hit the docking port.', failLost: 'You drifted too far from the station.',
+    rLat: 'Center', rSpeed: 'Speed', rRoll: 'Roll', rRate: 'Spin', rTime: 'Time', rFuel: 'RCS left', rScore: 'Score',
+    issInfo: (alt, v) => `ISS · ${alt} KM · ${v} KM/S`,
+  },
+};
+let lang = 'it';
+try { lang = localStorage.getItem('lang') || ''; } catch { /* storage non disponibile */ }
+if (!STR[lang]) lang = (navigator.language || '').toLowerCase().startsWith('it') ? 'it' : 'en';
+const t = (key, ...args) => { const v = STR[lang][key]; return typeof v === 'function' ? v(...args) : v ?? key; };
+const fmt = (v, d = 0) => v.toLocaleString(lang === 'it' ? 'it-IT' : 'en-GB', { minimumFractionDigits: d, maximumFractionDigits: d });
+document.documentElement.lang = lang;
+for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+for (const el of document.querySelectorAll('[data-i18n-html]')) el.innerHTML = t(el.dataset.i18nHtml);
+for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', t(el.dataset.i18nAria));
+
+// Quota e velocità vere della ISS, se arrivano dal globo
+{
+  const q = new URLSearchParams(location.search), alt = +q.get('alt'), v = +q.get('v');
+  if (alt && v) $('issInfo').textContent = t('issInfo', fmt(alt), fmt(v, 2));
+}
+
+// ---------------------------------------------------------------- regolazioni
+const settings = { sens: 1, assist: true, invert: false };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('dockSettings')) || {}); } catch { /* ok */ }
+const saveSettings = () => { try { localStorage.setItem('dockSettings', JSON.stringify(settings)); } catch { /* ok */ } };
+function showSettings() {
+  $('sens').value = settings.sens;
+  $('sensVal').textContent = fmt(settings.sens, 2) + '×';
+  $('btnAssist').setAttribute('aria-pressed', String(settings.assist));
+  $('assistVal').textContent = settings.assist ? 'ASSIST' : 'MANUAL';
+  $('btnInvert').setAttribute('aria-pressed', String(settings.invert));
+  $('invertVal').textContent = t(settings.invert ? 'invInverted' : 'invNormal');
+}
+$('sens').addEventListener('input', () => { settings.sens = +$('sens').value; saveSettings(); showSettings(); });
+$('btnAssist').addEventListener('click', () => { settings.assist = !settings.assist; saveSettings(); showSettings(); });
+$('btnInvert').addEventListener('click', () => { settings.invert = !settings.invert; saveSettings(); showSettings(); });
+showSettings();
+
+// ---------------------------------------------------------------- livelli e regole
+const LEVELS = {   // rotazione della stazione (°/s), distanza e scostamento laterale iniziali (m)
+  calm: { spin: 0, dist: 50, lat: 2 },
+  slow: { spin: 8, dist: 60, lat: 3 },
+  fast: { spin: 25, dist: 70, lat: 4 },
+  tumble: { spin: 60, dist: 80, lat: 5 },
+};
+const LEVEL_KEYS = { calm: 'lvCalm', slow: 'lvSlow', fast: 'lvFast', tumble: 'lvTumble' };
+const TOL = { lat: 0.25, speed: 0.35, roll: 5, rate: 3 };   // all'aggancio: m, m/s, °, °/s
+const LAT_ACC = 0.25, AX_ACC = 0.3, ROLL_ACC = 12 * DEG;    // propulsori a sensibilità 1: m/s², m/s², rad/s²
+const FUEL_BURN = 2.2;   // % di RCS al secondo con un comando al massimo
+const LOST_MARGIN = 60;  // m oltre la distanza iniziale: la stazione è persa
+const ASSIST_MAX_SPEED = 2;   // m/s, avanti e indietro, con il movimento ASSIST
+
+let level = 'slow';
+try { if (LEVELS[localStorage.getItem('dockLevel')]) level = localStorage.getItem('dockLevel'); } catch { /* ok */ }
+const levelsEl = $('levels');
+for (const k of Object.keys(LEVELS)) {
+  const b = document.createElement('button');
+  b.className = 'level';
+  b.dataset.level = k;
+  b.innerHTML = `${t(LEVEL_KEYS[k])}<small>${t(LEVEL_KEYS[k] + 'D')}</small>`;
+  b.addEventListener('click', () => { level = k; showLevels(); try { localStorage.setItem('dockLevel', k); } catch { /* ok */ } });
+  levelsEl.append(b);
+}
+const showLevels = () => { for (const b of levelsEl.children) b.setAttribute('aria-pressed', String(b.dataset.level === level)); };
+showLevels();
+
+const st = { running: false };   // stato della navetta e della stazione, vedi reset()
+function reset() {
+  const L = LEVELS[level], ang = Math.random() * Math.PI * 2;
+  Object.assign(st, {
+    running: true, time: 0, fuel: 100,
+    x: Math.cos(ang) * L.lat, y: Math.sin(ang) * L.lat, z: L.dist, vx: 0, vy: 0, vz: 0,
+    roll: 0, rollRate: 0,
+    tRoll: Math.random() * Math.PI * 2, tRate: L.spin * DEG * (Math.random() < 0.5 ? -1 : 1),
+  });
+}
+
+// ---------------------------------------------------------------- scena
+const renderer = new THREE.WebGLRenderer({ canvas: $('scene'), antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.autoClear = false;
+
+// Sfondo (Terra e stelle) in una scena a parte: ruota solo con il rollio della navetta.
+const bgScene = new THREE.Scene(), bgCam = new THREE.PerspectiveCamera(60, 1, 0.001, 200);
+{
+  const n = 2500, pos = new Float32Array(n * 3), v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) { v.randomDirection().multiplyScalar(80); pos.set([v.x, v.y, v.z], i * 3); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  bgScene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: false })));
+}
+const earthMat = new THREE.MeshPhongMaterial({ color: 0x1a3d6d, shininess: 8 });
+const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), earthMat);
+earth.position.set(0, -1.12, -0.4);   // sotto la ISS: riempie la parte bassa della vista
+earth.rotation.set(0.4, 2.2, 0);
+bgScene.add(earth);
+bgScene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const bgSun = new THREE.DirectionalLight(0xffffff, 2.2);
+bgSun.position.set(-2, 1.5, 1.5);
+bgScene.add(bgSun);
+new THREE.TextureLoader().load('https://cdn.jsdelivr.net/npm/three-globe@2.31.0/example/img/earth-blue-marble.jpg', (tex) => {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  earthMat.map = tex; earthMat.color.set(0xffffff); earthMat.needsUpdate = true;
+});
+// Alone dell'atmosfera
+bgScene.add(new THREE.Mesh(new THREE.SphereGeometry(1.025, 64, 48), new THREE.MeshBasicMaterial({
+  color: 0x5aa0ff, transparent: true, opacity: 0.18, side: THREE.BackSide,
+})).translateX(0).translateY(-1.12).translateZ(-0.4));
+
+// La ISS (semplificata, in metri): portello all'origine verso +z, il resto dietro.
+const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const sun = new THREE.DirectionalLight(0xffffff, 2.6);
+sun.position.set(-40, 60, 80);
+scene.add(sun);
+const station = new THREE.Group();
+scene.add(station);
+{
+  const white = new THREE.MeshStandardMaterial({ color: 0xe6e6e2, metalness: 0.15, roughness: 0.6 });
+  const gold = new THREE.MeshStandardMaterial({ color: 0xc9a24b, metalness: 0.5, roughness: 0.45 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x8c9096, metalness: 0.6, roughness: 0.4 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x111114, roughness: 0.8 });
+  // Pannelli solari: blu scuro con la griglia delle celle
+  const cells = document.createElement('canvas');
+  cells.width = 64; cells.height = 256;
+  {
+    const x = cells.getContext('2d');
+    x.fillStyle = '#18264a'; x.fillRect(0, 0, 64, 256);
+    x.strokeStyle = '#5a6f9e'; x.lineWidth = 1;
+    for (let i = 0; i <= 64; i += 16) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 256); x.stroke(); }
+    for (let j = 0; j <= 256; j += 8) { x.beginPath(); x.moveTo(0, j); x.lineTo(64, j); x.stroke(); }
+  }
+  const cellTex = new THREE.CanvasTexture(cells);
+  cellTex.colorSpace = THREE.SRGBColorSpace;
+  const solar = new THREE.MeshStandardMaterial({ map: cellTex, metalness: 0.4, roughness: 0.35, side: THREE.DoubleSide });
+
+  const add = (geo, mat, x, y, z, rx = 0, ry = 0, rz = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x, y, z); m.rotation.set(rx, ry, rz);
+    station.add(m);
+    return m;
+  };
+  const tube = (r, len, mat, x, y, z, axis) => add(new THREE.CylinderGeometry(r, r, len, 32), mat, x, y, z,
+    axis === 'z' ? Math.PI / 2 : 0, 0, axis === 'x' ? Math.PI / 2 : 0);
+
+  // Portello: anello, adattatore a cono e bersaglio di allineamento al centro
+  add(new THREE.TorusGeometry(0.85, 0.09, 16, 48), metal, 0, 0, 0);
+  add(new THREE.CylinderGeometry(0.85, 1.3, 3, 32, 1, true), gold, 0, 0, -1.5, Math.PI / 2);
+  add(new THREE.CircleGeometry(0.85, 32), dark, 0, 0, -0.6);
+  add(new THREE.CircleGeometry(0.32, 32), new THREE.MeshBasicMaterial({ color: 0x0a0a0a }), 0, 0, -0.55);
+  const crossMat = new THREE.MeshBasicMaterial({ color: 0xf5f5f0 });
+  add(new THREE.BoxGeometry(0.5, 0.05, 0.05), crossMat, 0, 0, 0.25);   // croce sporgente: centrata quando sei sull'asse
+  add(new THREE.BoxGeometry(0.05, 0.5, 0.05), crossMat, 0, 0, 0.25);
+  add(new THREE.BoxGeometry(0.04, 0.04, 0.8), crossMat, 0, 0, -0.15);
+  add(new THREE.ConeGeometry(0.12, 0.25, 3), new THREE.MeshBasicMaterial({ color: 0xff3030 }), 0, 1.05, 0);   // "su" del portello
+  for (const a of [0, 1, 2, 3]) {   // luci verdi attorno all'anello
+    const l = add(new THREE.SphereGeometry(0.06, 8, 8), new THREE.MeshBasicMaterial({ color: 0x39ff7a }), 0, 0, 0.05);
+    l.position.set(Math.cos(a * Math.PI / 2 + Math.PI / 4) * 1.02, Math.sin(a * Math.PI / 2 + Math.PI / 4) * 1.02, 0.05);
+  }
+
+  // Moduli pressurizzati
+  tube(2.2, 7, white, 0, 0, -6.5, 'z');            // nodo
+  tube(2.2, 7, white, 6.5, 0, -6.5, 'x');          // laboratorio a destra
+  tube(2.1, 10, white, -8, 0, -6.5, 'x');          // laboratorio a sinistra
+  tube(2.2, 9, white, 0, 0, -14.5, 'z');           // laboratorio dietro
+  tube(2.1, 8, white, 0, 0, -23, 'z');
+  tube(2, 13, white, 0, 0, -33.5, 'z');            // segmento russo
+  add(new THREE.SphereGeometry(2.3, 24, 16), white, 0, 0, -10);
+
+  // Traliccio con i pannelli solari e i radiatori
+  add(new THREE.BoxGeometry(100, 1.6, 1.6), metal, 0, 4, -19);
+  add(new THREE.BoxGeometry(1.4, 4, 1.4), metal, 0, 2, -19);
+  for (const sx of [-1, 1]) {
+    for (const off of [33, 45]) {
+      add(new THREE.BoxGeometry(1.2, 2.2, 1.2), metal, sx * off, 4, -19);
+      add(new THREE.BoxGeometry(11, 34, 0.08), solar, sx * off, 22.5, -19);    // ala verso l'alto
+      add(new THREE.BoxGeometry(11, 34, 0.08), solar, sx * off, -14.5, -19);   // ala verso il basso
+      add(new THREE.BoxGeometry(0.3, 72, 0.3), metal, sx * off, 4, -19.1);
+    }
+    add(new THREE.BoxGeometry(3, 0.1, 13), white, sx * 14, 0.5, -19);          // radiatori
+    add(new THREE.BoxGeometry(3, 0.1, 13), white, sx * 18, 0.5, -19);
+  }
+  add(new THREE.BoxGeometry(8, 0.1, 22), solar, 0, -3, -36);   // pannelli del segmento russo
+}
+
+function layout() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = bgCam.aspect = w / h;
+  camera.updateProjectionMatrix(); bgCam.updateProjectionMatrix();
+}
+window.addEventListener('resize', layout);
+layout();
+
+// ---------------------------------------------------------------- cloche (laterale)
+// Stessa cloche del globo (index.html), copiata qui: con un modulo condiviso index.html aperto
+// con doppio clic non funzionerebbe più (i browser bloccano gli import da file://).
+const stick = $('stick'), g = stick.getContext('2d');
+const joy = { x: 0, y: 0, vx: 0, vy: 0, dragging: false, pointerId: null, dragX: 0, dragY: 0, keys: new Set(), dirty: true };
+const KNOB_TRAVEL = 0.27, SPRING_K = 260, SPRING_C = 24, DEADZONE = 0.08;
+function sizeStick() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3), s = Math.round(stick.clientWidth * dpr);
+  if (stick.width !== s) { stick.width = stick.height = s; joy.dirty = true; }
+}
+new ResizeObserver(sizeStick).observe(stick);
+sizeStick();
+function pointerToStick(e) {
+  const r = stick.getBoundingClientRect(), travel = r.width * KNOB_TRAVEL;
+  let x = (e.clientX - (r.left + r.width / 2)) / travel, y = -(e.clientY - (r.top + r.height / 2)) / travel;
+  const m = Math.hypot(x, y);
+  if (m > 1) { x /= m; y /= m; }
+  joy.dragX = x; joy.dragY = y;
+}
+stick.addEventListener('pointerdown', (e) => {
+  if (joy.dragging) return;
+  e.preventDefault();
+  stick.setPointerCapture(e.pointerId);
+  joy.dragging = true; joy.pointerId = e.pointerId;
+  stick.classList.add('grabbing');
+  pointerToStick(e);
+});
+stick.addEventListener('pointermove', (e) => { if (joy.dragging && e.pointerId === joy.pointerId) pointerToStick(e); });
+function releaseStick(e) {
+  if (e.pointerId !== joy.pointerId) return;
+  joy.dragging = false; joy.pointerId = null; joy.vx = joy.vy = 0;
+  stick.classList.remove('grabbing');
+}
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(ev, releaseStick);
+function updateJoystick(dt) {
+  const px = joy.x, py = joy.y;
+  if (joy.dragging) {
+    joy.x = joy.dragX; joy.y = joy.dragY;
+  } else {
+    let tx = (joy.keys.has('right') ? 1 : 0) - (joy.keys.has('left') ? 1 : 0);
+    let ty = (joy.keys.has('up') ? 1 : 0) - (joy.keys.has('down') ? 1 : 0);
+    const m = Math.hypot(tx, ty);
+    if (m > 1) { tx /= m; ty /= m; }
+    const steps = Math.ceil(dt / (1 / 240)), h = dt / steps;
+    for (let i = 0; i < steps; i++) {
+      joy.vx += (SPRING_K * (tx - joy.x) - SPRING_C * joy.vx) * h;
+      joy.vy += (SPRING_K * (ty - joy.y) - SPRING_C * joy.vy) * h;
+      joy.x += joy.vx * h; joy.y += joy.vy * h;
+    }
+    if (Math.abs(joy.x - tx) < 1e-4 && Math.abs(joy.vx) < 1e-3) { joy.x = tx; joy.vx = 0; }
+    if (Math.abs(joy.y - ty) < 1e-4 && Math.abs(joy.vy) < 1e-3) { joy.y = ty; joy.vy = 0; }
+  }
+  if (joy.x !== px || joy.y !== py) joy.dirty = true;
+}
+function stickOutput() {
+  const m = Math.hypot(joy.x, joy.y);
+  if (m < DEADZONE) return { x: 0, y: 0 };
+  const k = Math.min(1, (m - DEADZONE) / (1 - DEADZONE)) / m;
+  return { x: joy.x * k, y: joy.y * k };
+}
+function circle(x, y, r) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); }
+function drawStick() {
+  const S = stick.width, c = S / 2;
+  g.clearRect(0, 0, S, S);
+  const pad = S * 0.035, w = S - pad * 2;
+  g.beginPath(); g.roundRect(pad, pad, w, w, S * 0.12);
+  let gr = g.createLinearGradient(0, pad, 0, S - pad);
+  gr.addColorStop(0, '#36363d'); gr.addColorStop(1, '#101013');
+  g.fillStyle = gr; g.fill();
+  g.lineWidth = S * 0.01; g.strokeStyle = 'rgba(255,255,255,.10)'; g.stroke();
+  const so = pad + S * 0.085, sr = S * 0.026;
+  for (const [x, y] of [[so, so], [S - so, so], [so, S - so], [S - so, S - so]]) {
+    circle(x, y, sr);
+    gr = g.createRadialGradient(x - sr * 0.4, y - sr * 0.4, 0, x, y, sr);
+    gr.addColorStop(0, '#e0e0e0'); gr.addColorStop(1, '#55555c');
+    g.fillStyle = gr; g.fill();
+    g.strokeStyle = '#2a2a2e'; g.lineWidth = S * 0.007;
+    g.beginPath(); g.moveTo(x - sr * 0.6, y + sr * 0.6); g.lineTo(x + sr * 0.6, y - sr * 0.6); g.stroke();
+  }
+  const Z = S * 1.2, EYE = 40 * DEG, TILT = 22 * DEG, L = Z * 0.42, FLAT = Math.sin(EYE);
+  const px = c, py = c + S * 0.22;
+  const a = joy.y * TILT, b = joy.x * TILT;
+  const tx = px + L * Math.sin(b), ty = py - L * Math.cos(a - EYE) * Math.cos(b);
+  const dx = tx - px, dy = ty - py, len = Math.hypot(dx, dy), ang = Math.atan2(dx, -dy);
+  const at = (f) => [px + dx * f, py + dy * f];
+  const wr = Z * 0.27;
+  g.beginPath(); g.ellipse(px, py, wr, wr * FLAT, 0, 0, Math.PI * 2);
+  gr = g.createRadialGradient(px, py, 0, px, py, wr);
+  gr.addColorStop(0, '#020203'); gr.addColorStop(1, '#16161b');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = Z * 0.008; g.stroke();
+  g.strokeStyle = 'rgba(79,227,255,.45)'; g.lineWidth = Z * 0.01; g.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const th = i * Math.PI / 4, cx = Math.cos(th), sy = Math.sin(th) * FLAT;
+    g.beginPath(); g.moveTo(px + cx * wr * 0.84, py + sy * wr * 0.84); g.lineTo(px + cx * wr * 0.95, py + sy * wr * 0.95); g.stroke();
+  }
+  const [shx, shy] = [px + dx * 0.35 + Z * 0.05, py + Z * 0.03];
+  g.save(); g.translate(shx, shy); g.scale(1, FLAT * 0.8);
+  gr = g.createRadialGradient(0, 0, 0, 0, 0, Z * 0.2);
+  gr.addColorStop(0, 'rgba(0,0,0,.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; circle(0, 0, Z * 0.2); g.fill();
+  g.restore();
+  for (let i = 0; i <= 6; i++) {
+    const f = i / 6 * 0.2, r = Z * (0.17 - i * 0.017), [x, y] = at(f);
+    g.beginPath(); g.ellipse(x, y, r, r * FLAT, ang * 0.6, 0, Math.PI * 2);
+    gr = g.createLinearGradient(x - r, y - r * FLAT, x + r, y + r * FLAT);
+    gr.addColorStop(0, i % 2 ? '#2a2b2f' : '#34353a'); gr.addColorStop(1, '#060607');
+    g.fillStyle = gr; g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = Z * 0.006; g.stroke();
+  }
+  g.save();
+  g.translate(px, py); g.rotate(ang);
+  const u = len, y0 = -0.3 * u, y1 = -0.84 * u, lerp = (p, q, k) => p + (q - p) * k;
+  const sw = Z * 0.03;
+  gr = g.createLinearGradient(-sw, 0, sw, 0);
+  gr.addColorStop(0, '#3a3a40'); gr.addColorStop(0.35, '#d0d0d4'); gr.addColorStop(1, '#2a2a2e');
+  g.fillStyle = gr; g.fillRect(-sw, -0.2 * u, sw * 2, -0.12 * u);
+  const wB = Z * 0.055, wT = Z * 0.068;
+  g.beginPath();
+  g.moveTo(-wB, y0);
+  g.bezierCurveTo(-wB * 1.15, lerp(y0, y1, 0.4), -wT * 1.05, lerp(y0, y1, 0.75), -wT, y1);
+  g.lineTo(wT, y1);
+  g.bezierCurveTo(wT * 1.3, lerp(y0, y1, 0.7), wB * 1.4, lerp(y0, y1, 0.35), wB, y0);
+  g.quadraticCurveTo(0, y0 + Z * 0.025, -wB, y0);
+  g.closePath();
+  gr = g.createLinearGradient(-wT, 0, wT * 1.3, 0);
+  gr.addColorStop(0, '#55585f'); gr.addColorStop(0.3, '#2c2e33'); gr.addColorStop(0.75, '#131417'); gr.addColorStop(1, '#070708');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.8)'; g.lineWidth = Z * 0.006; g.stroke();
+  g.save(); g.clip();
+  for (let k = 0; k < 6; k++) {
+    const yy = lerp(y0, y1, 0.14 + k * 0.13);
+    g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = Z * 0.007;
+    g.beginPath(); g.moveTo(-wT * 1.4, yy); g.lineTo(wT * 1.4, yy); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = Z * 0.004;
+    g.beginPath(); g.moveTo(-wT * 1.4, yy + Z * 0.007); g.lineTo(wT * 1.4, yy + Z * 0.007); g.stroke();
+  }
+  g.restore();
+  g.beginPath(); g.roundRect(wB * 1.15, lerp(y0, y1, 0.22), Z * 0.03, Z * 0.055, Z * 0.012);
+  g.fillStyle = '#1e1f23'; g.fill(); g.strokeStyle = '#000'; g.lineWidth = Z * 0.005; g.stroke();
+  const hrx = Z * 0.085, hry = Z * (0.045 + 0.05 * Math.max(0, 1 - len / (L * Math.cos(EYE)))), hy = y1 - hry * 0.55;
+  g.beginPath(); g.ellipse(0, hy, hrx, hry, 0, 0, Math.PI * 2);
+  gr = g.createLinearGradient(-hrx, hy - hry, hrx, hy + hry);
+  gr.addColorStop(0, '#4b4e55'); gr.addColorStop(0.5, '#25272b'); gr.addColorStop(1, '#0c0c0e');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineWidth = Z * 0.006; g.stroke();
+  const rbx = -hrx * 0.38, rby = hy - hry * 0.15, rbr = Z * 0.022;
+  circle(rbx, rby, rbr * 1.45); g.fillStyle = '#0b0b0d'; g.fill();
+  circle(rbx, rby, rbr);
+  gr = g.createRadialGradient(rbx - rbr * 0.35, rby - rbr * 0.4, rbr * 0.1, rbx, rby, rbr);
+  gr.addColorStop(0, '#ffb3b3'); gr.addColorStop(0.35, '#ff2a2a'); gr.addColorStop(1, '#6a0000');
+  g.fillStyle = gr; g.fill();
+  const hx = hrx * 0.42, hhy = hy - hry * 0.2, hr = Z * 0.021;
+  circle(hx, hhy, hr);
+  gr = g.createRadialGradient(hx - hr * 0.3, hhy - hr * 0.3, 0, hx, hhy, hr);
+  gr.addColorStop(0, '#9a9ea6'); gr.addColorStop(1, '#2a2c30');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = '#111'; g.lineWidth = Z * 0.006;
+  g.beginPath(); g.moveTo(hx - hr * 0.6, hhy); g.lineTo(hx + hr * 0.6, hhy); g.moveTo(hx, hhy - hr * 0.6); g.lineTo(hx, hhy + hr * 0.6); g.stroke();
+  circle(0, hy + hry * 0.45, Z * 0.011);
+  g.fillStyle = '#0a0a0b'; g.fill(); g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = Z * 0.004; g.stroke();
+  g.restore();
+}
+
+// ---------------------------------------------------------------- leva di spinta e rollio
+const lever = $('lever'), knob = $('knob');
+const thr = { v: 0, vel: 0, dragging: false, pointerId: null, drag: 0, keys: 0 };
+function pointerToLever(e) {
+  const r = lever.getBoundingClientRect(), half = (r.height - 30) / 2;
+  thr.drag = Math.max(-1, Math.min(1, -(e.clientY - (r.top + r.height / 2)) / half));
+}
+lever.addEventListener('pointerdown', (e) => {
+  e.preventDefault(); lever.setPointerCapture(e.pointerId);
+  thr.dragging = true; thr.pointerId = e.pointerId; pointerToLever(e);
+});
+lever.addEventListener('pointermove', (e) => { if (thr.dragging && e.pointerId === thr.pointerId) pointerToLever(e); });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  lever.addEventListener(ev, (e) => { if (e.pointerId === thr.pointerId) { thr.dragging = false; thr.pointerId = null; } });
+}
+function updateLever(dt) {
+  const target = thr.dragging ? thr.drag : thr.keys;
+  if (thr.dragging) thr.v = target;
+  else {   // molla verso il centro, come la cloche
+    thr.vel += (SPRING_K * (target - thr.v) - SPRING_C * thr.vel) * dt;
+    thr.v += thr.vel * dt;
+    if (Math.abs(thr.v - target) < 1e-3 && Math.abs(thr.vel) < 1e-2) { thr.v = target; thr.vel = 0; }
+  }
+  const half = (lever.clientHeight - 30) / 2;
+  knob.style.transform = `translateY(${-thr.v * half}px)`;
+  lever.setAttribute('aria-valuenow', thr.v.toFixed(2));
+}
+const thrustOut = () => (Math.abs(thr.v) < 0.06 ? 0 : thr.v);
+
+const roll = { btn: 0, keys: 0 };
+for (const [id, dir] of [['rollL', 1], ['rollR', -1]]) {   // antiorario = rollio positivo
+  const b = $(id);
+  const down = (e) => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); roll.btn = dir; b.classList.add('pressed'); };
+  const up = () => { if (roll.btn === dir) roll.btn = 0; b.classList.remove('pressed'); };
+  b.addEventListener('pointerdown', down);
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, up);
+  b.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+const rollOut = () => roll.btn || roll.keys;
+
+// Tastiera: frecce = laterale, W/S = spinta, Q/E = rollio, Invio = inizia/riprova
+const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+const held = new Set();
+function syncKeys() {
+  thr.keys = (held.has('KeyW') ? 1 : 0) - (held.has('KeyS') ? 1 : 0);
+  roll.keys = (held.has('KeyQ') ? 1 : 0) - (held.has('KeyE') ? 1 : 0);
+}
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input')) return;
+  const k = KEYMAP[e.code];
+  if (k) { e.preventDefault(); joy.keys.add(k); return; }
+  if (['KeyW', 'KeyS', 'KeyQ', 'KeyE'].includes(e.code)) { held.add(e.code); syncKeys(); return; }
+  if (e.code === 'Enter' && !st.running) start();
+});
+window.addEventListener('keyup', (e) => {
+  const k = KEYMAP[e.code];
+  if (k) joy.keys.delete(k);
+  held.delete(e.code); syncKeys();
+});
+window.addEventListener('blur', () => { joy.keys.clear(); held.clear(); syncKeys(); });
+
+// ---------------------------------------------------------------- fisica
+const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+function step(dt) {
+  const s = settings.sens, on = st.fuel > 0 ? 1 : 0;
+  const out = stickOutput(), sx = out.x, sy = out.y * (settings.invert ? -1 : 1), tf = thrustOut(), rl = rollOut();
+  // La cloche spinge nel riferimento della navetta, che è ruotato del suo rollio: destra e su
+  // sono quelli dello schermo. Se la navetta gira, gira anche la direzione delle spinte.
+  const c = Math.cos(st.roll), sn = Math.sin(st.roll);
+  st.vx += (c * sx - sn * sy) * LAT_ACC * s * on * dt;
+  st.vy += (sn * sx + c * sy) * LAT_ACC * s * on * dt;
+  st.vz -= tf * AX_ACC * s * on * dt;   // leva in avanti: verso la stazione (z cala)
+  st.rollRate += rl * ROLL_ACC * s * on * dt;
+  let burn = (Math.hypot(sx, sy) + Math.abs(tf) + Math.abs(rl)) * FUEL_BURN;
+  if (settings.assist && on) {
+    // Smorzatori: senza comandi la navetta smette da sola di scivolare di lato (costa carburante)
+    // e non supera ASSIST_MAX_SPEED in avanti o indietro; l'avanzamento resta per inerzia, come
+    // nello spazio. Il rollio no: sincronizzarsi con la stazione resta compito tuo.
+    const k = 1 - Math.exp(-0.9 * dt);
+    if (!sx && !sy) { burn += Math.hypot(st.vx, st.vy) * k / (LAT_ACC * dt) * FUEL_BURN * 0.5; st.vx -= st.vx * k; st.vy -= st.vy * k; }
+    st.vz = Math.max(-ASSIST_MAX_SPEED, Math.min(ASSIST_MAX_SPEED, st.vz));
+  }
+  st.fuel = Math.max(0, st.fuel - burn * dt);
+  st.x += st.vx * dt; st.y += st.vy * dt; st.z += st.vz * dt;
+  st.roll += st.rollRate * dt;
+  st.tRoll += st.tRate * dt;
+  st.time += dt;
+  if (st.z <= 0) finish('contact');
+  else if (st.z > LEVELS[level].dist + LOST_MARGIN || Math.hypot(st.x, st.y) > 40) finish('lost');
+}
+
+function errors() {
+  return {
+    lat: Math.hypot(st.x, st.y), speed: -st.vz,
+    roll: Math.abs(wrapPi(st.tRoll - st.roll)) / DEG, rate: Math.abs(st.tRate - st.rollRate) / DEG,
+  };
+}
+
+// ---------------------------------------------------------------- partita
+function start() {
+  reset();
+  $('startScreen').hidden = true;
+  $('endScreen').hidden = true;
+}
+function finish(why) {
+  st.running = false;
+  const e = errors();
+  const ok = why === 'contact' && e.lat <= TOL.lat && e.speed <= TOL.speed && e.roll <= TOL.roll && e.rate <= TOL.rate;
+  const score = ok ? Math.max(100, Math.round(1000 + st.fuel * 5 - st.time * 2
+    - e.lat / TOL.lat * 100 - e.speed / TOL.speed * 100 - e.roll / TOL.roll * 100 - e.rate / TOL.rate * 100)) : 0;
+  $('endTitle').textContent = t(ok ? 'winTitle' : 'failTitle');
+  $('endTitle').style.color = ok ? 'var(--green)' : 'var(--red)';
+  $('endText').textContent = ok ? t('winText', t(LEVEL_KEYS[level])) : t(why === 'lost' ? 'failLost' : 'failCrash');
+  const row = (k, v, good) => `<dt>${t(k)}</dt><dd class="${good === undefined ? '' : good ? 'ok' : 'ko'}">${v}</dd>`;
+  $('endResult').innerHTML = why === 'lost' ? row('rTime', fmt(st.time, 1) + ' s') : [
+    row('rLat', fmt(e.lat * 100) + ' cm', e.lat <= TOL.lat),
+    row('rSpeed', fmt(e.speed, 2) + ' m/s', e.speed <= TOL.speed),
+    row('rRoll', fmt(e.roll, 1) + '°', e.roll <= TOL.roll),
+    row('rRate', fmt(e.rate, 1) + '°/s', e.rate <= TOL.rate),
+    row('rTime', fmt(st.time, 1) + ' s'),
+    row('rFuel', fmt(st.fuel) + '%'),
+    ...(ok ? [row('rScore', fmt(score), true)] : []),
+  ].join('');
+  $('endScreen').hidden = false;
+}
+$('btnStart').addEventListener('click', start);
+$('btnRetry').addEventListener('click', start);
+$('btnLevels').addEventListener('click', () => { $('endScreen').hidden = true; $('startScreen').hidden = false; });
+
+// ---------------------------------------------------------------- HUD
+const portMark = $('portMark'), proj = new THREE.Vector3();
+function setVal(id, text, level) {
+  const el = $(id);
+  if (el.textContent !== text) el.textContent = text;
+  el.className = level || '';
+}
+function updateHud() {
+  if (!st.running) return;
+  const e = errors();
+  const near = st.z < 15;
+  setVal('tDist', fmt(st.z, 1) + ' m');
+  setVal('tSpeed', fmt(e.speed, 2) + ' m/s', e.speed < 0 ? 'warn' : near && e.speed > TOL.speed ? 'bad' : '');
+  // Scostamento nel riferimento della navetta: + a destra/in alto sullo schermo
+  const c = Math.cos(st.roll), sn = Math.sin(st.roll);
+  const lx = c * st.x + sn * st.y, ly = -sn * st.x + c * st.y;
+  setVal('tLat', `${lx >= 0 ? '+' : ''}${fmt(lx, 2)} ${ly >= 0 ? '+' : ''}${fmt(ly, 2)}`, e.lat > TOL.lat ? (near ? 'bad' : 'warn') : '');
+  setVal('tRoll', fmt(wrapPi(st.tRoll - st.roll) / DEG, 1) + '°', e.roll > TOL.roll ? (near ? 'bad' : 'warn') : '');
+  setVal('tRate', fmt((st.tRate - st.rollRate) / DEG, 1) + '°/s', e.rate > TOL.rate ? (near ? 'bad' : 'warn') : '');
+  setVal('tTime', fmt(st.time, 1) + ' s');
+  setVal('tFuel', fmt(st.fuel) + '%', st.fuel < 20 ? 'bad' : st.fuel < 40 ? 'warn' : '');
+  $('fuelBar').style.width = st.fuel.toFixed(1) + '%';
+
+  // Segno sul portello, utile da lontano
+  proj.set(0, 0, 0).project(camera);
+  const vis = proj.z < 1 && Math.abs(proj.x) < 1 && Math.abs(proj.y) < 1 && st.z > 4;
+  portMark.hidden = !vis;
+  if (vis) {
+    portMark.style.left = ((proj.x + 1) / 2 * window.innerWidth) + 'px';
+    portMark.style.top = ((1 - proj.y) / 2 * window.innerHeight) + 'px';
+  }
+  let msg = '';
+  if (st.fuel <= 0) msg = t('mNoFuel');
+  else if (st.z < 20) {
+    if (e.rate > TOL.rate || e.roll > TOL.roll) msg = t('mRoll');
+    else if (e.lat > TOL.lat) msg = t('mCenter');
+    else if (e.speed > TOL.speed) msg = t('mSlow');
+    else msg = t('mGood');
+  }
+  $('msg').textContent = msg;
+  $('msg').style.color = msg === t('mGood') ? 'var(--green)' : '';
+}
+
+// ---------------------------------------------------------------- loop
+let prev = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - prev) / 1000);
+  prev = now;
+  updateJoystick(dt);
+  if (joy.dirty) { drawStick(); joy.dirty = false; }
+  updateLever(dt);
+  if (st.running) {
+    const n = Math.ceil(dt / (1 / 120));
+    for (let i = 0; i < n && st.running; i++) step(dt / n);
+  } else if (st.tRate !== undefined) {
+    st.tRoll += st.tRate * dt;   // a partita finita la stazione continua a girare
+  }
+  station.rotation.z = st.tRoll || 0;
+  camera.position.set(st.x ?? 3, st.y ?? 2, st.z ?? 60);
+  camera.rotation.set(0, 0, st.roll || 0);
+  bgCam.rotation.set(0, 0, st.roll || 0);
+  updateHud();
+  renderer.clear();
+  renderer.render(bgScene, bgCam);
+  renderer.clearDepth();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+// Prima della partita: la stazione gira con la rotazione del livello scelto, vista da lontano
+Object.assign(st, { tRoll: 0, tRate: 8 * DEG, x: 3, y: 2, z: 60, roll: 0 });
+requestAnimationFrame(frame);
+
+window.dockGame = { st, settings, start, finish, LEVELS, TOL };   // per le prove dalla console
+</script>
+</body>
+</html>

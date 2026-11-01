@@ -32,6 +32,23 @@ offline il globo mostra una griglia.
 | Bandierina nel pannello comandi | passa dall'italiano all'inglese e viceversa; la prima volta la pagina segue la lingua del browser |
 | Clic / tocco su un satellite | apre la schedina (con `Esc` o ✕ si chiude); CENTRA porta il globo sopra il satellite |
 
+## Attracco alla ISS
+
+Nella schedina della ISS (✦ VAI A ISS) il pulsante **PROVA L'ATTRACCO** apre [dock.html](dock.html): un
+minigioco in cui la stazione gira attorno all'asse del portello e bisogna agganciarsi.
+
+- **ROLL** (↺ ↻, `Q` `E`): fai ruotare la navetta alla stessa velocità della stazione. Quando sei
+  sincronizzato la ISS sembra ferma e sono Terra e stelle a girare.
+- **Cloche** (frecce): spostamenti laterali, nel riferimento della navetta: se la navetta gira, girano
+  anche le direzioni.
+- **Leva di spinta** (`W` `S`): avanti e indietro. Torna al centro quando la lasci.
+- **Regolazioni sul pannello:** sensibilità (0,25–2×), movimento **ASSIST** (gli smorzatori fermano da
+  soli gli spostamenti laterali e tengono l'avanzamento sotto 2 m/s; il rollio no) o **MANUAL** (inerzia pura), asse Y normale o
+  invertito. Restano nel browser.
+- **Livelli:** stazione ferma, 8°/s, 25°/s e «in avaria» a 60°/s.
+- **Aggancio riuscito** se al contatto sei entro 25 cm dal centro, sotto 0,35 m/s, con rollio entro 5° e
+  rotazione entro 3°/s. Il carburante dei propulsori (RCS) è limitato.
+
 ## Satelliti
 
 - **Orbite:** elementi orbitali in formato OMM (JSON) da [CelesTrak](https://celestrak.org). Non TLE: le

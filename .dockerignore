@@ -1,3 +1,4 @@
-# Nell'immagine del sito entra solo la pagina
+# Nell'immagine del sito entrano solo le pagine
 *
 !index.html
+!dock.html

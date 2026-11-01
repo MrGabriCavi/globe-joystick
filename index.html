@@ -76,6 +76,14 @@
     border: 1px solid #33333d; background: #1a1a20; color: var(--ink); font-size: 14px; cursor: pointer;
   }
   .card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  /* Pulsantone del minigioco di attracco (solo nella schedina della ISS) */
+  .dock-btn {
+    display: block; margin-top: 14px; padding: 15px 12px; border-radius: 12px; text-align: center;
+    font: 10px 'Press Start 2P', monospace; color: #1a0f00; text-decoration: none;
+    background: linear-gradient(#ffd25a, #ff9d00); box-shadow: 0 4px 0 #8a5200, 0 6px 14px rgba(0,0,0,.5);
+  }
+  .dock-btn:hover { filter: brightness(1.08); }
+  .dock-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #8a5200; }
   .pill {
     font: 8px 'Press Start 2P', monospace; padding: 9px 11px; border-radius: 999px; cursor: pointer;
     border: 1px solid #3a3a44; background: #16161c; color: var(--ink); text-decoration: none;
@@ -279,6 +287,7 @@
     <a class="pill" id="cardN2yo" target="_blank" rel="noopener">N2YO ↗</a>
     <a class="pill" id="cardWiki" target="_blank" rel="noopener" hidden>WIKI ↗</a>
   </div>
+  <a class="dock-btn" id="cardDock" href="dock.html" hidden data-i18n="dockTry">▶ PROVA L'ATTRACCO</a>
 </aside>
 
 <section class="deck" id="deck">
@@ -345,6 +354,7 @@ const STR = {
     allTitle: 'TUTTI GLI OGGETTI · N2YO', allLoading: 'Chiedo a N2YO tutto quello che hai sopra la testa…',
     allSome: (n, min, at) => `${n} oggetti sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}). Satelliti e stazioni sono icone singole; stadi di razzo e detriti, da lontano, sono raggruppati: tocca un gruppo per avvicinarti, o un nome qui sotto per andarci.`,
     allHidden: (n) => `Altri ${n} sono stadi di razzo e detriti: per vederli, arma l'interruttore MASTER ARM.`,
+    dockTry: '▶ PROVA L\'ATTRACCO',
     armTitle: 'MASTER ARM: in SAFE solo satelliti e stazioni spaziali, in ARM anche stadi di razzo e detriti',
     allMore: (n) => `…e altri ${n}.`, allNone: 'N2YO non vede niente sopra di te adesso.',
     allBusy: 'Troppe richieste a N2YO in questo momento: riprova fra qualche minuto.',
@@ -381,6 +391,7 @@ const STR = {
     allTitle: 'EVERYTHING · N2YO', allLoading: 'Asking N2YO for everything above your head…',
     allSome: (n, min, at) => `${n} objects are more than ${min}° above the horizon (positions at ${at}). Satellites and stations are single icons; rocket bodies and debris are grouped from afar: tap a group to zoom in, or a name below to go there.`,
     allHidden: (n) => `${n} more are rocket bodies and debris: flip the MASTER ARM switch to see them.`,
+    dockTry: '▶ TRY DOCKING',
     armTitle: 'MASTER ARM: SAFE shows only satellites and space stations, ARM adds rocket bodies and debris',
     allMore: (n) => `…and ${n} more.`, allNone: 'N2YO sees nothing above you right now.',
     allBusy: 'Too many requests to N2YO right now: try again in a few minutes.',
@@ -1379,7 +1390,7 @@ function setCardMode(mode) {
   for (const id of ['cardLive', 'cardInfo', 'cardN2yo']) $(id).hidden = mode !== 'sat';
   $('cardList').hidden = mode !== 'overhead';
   $('cardAll').hidden = true;   // la sezione N2YO la mostra renderAllAbove
-  $('cardImg').hidden = $('cardImgCredit').hidden = $('cardDesc').hidden = $('cardWiki').hidden = true;
+  $('cardImg').hidden = $('cardImgCredit').hidden = $('cardDesc').hidden = $('cardWiki').hidden = $('cardDock').hidden = true;
   card.scrollTop = 0;
 }
 function openCard(s) {
@@ -1388,6 +1399,10 @@ function openCard(s) {
   $('cardSub').textContent = `NORAD ${s.id}` + (s.cospar ? ` · ${s.cospar}` : '');
   $('cardN2yo').href = `https://www.n2yo.com/satellite/?s=${s.id}`;
   $('cardImg').removeAttribute('src');
+  if (s.id === ISS_ID) {   // minigioco di attracco, con quota e velocità vere della ISS
+    $('cardDock').href = s.ok ? `dock.html?alt=${Math.round(s.alt)}&v=${s.speed.toFixed(2)}` : 'dock.html';
+    $('cardDock').hidden = false;
+  }
   renderCardLive();
   renderRows($('cardInfo'), [[t('catalog'), t('catalogLoading')]]);
   loadDetails(s);
