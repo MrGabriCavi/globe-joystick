@@ -41,7 +41,11 @@ minigioco in cui la stazione gira attorno all'asse del portello e bisogna agganc
   sincronizzato la ISS sembra ferma e sono Terra e stelle a girare.
 - **Cloche** (frecce): spostamenti laterali, nel riferimento della navetta: se la navetta gira, girano
   anche le direzioni.
-- **Leva di spinta** (`W` `S`): avanti e indietro. Torna al centro quando la lasci.
+- **Leva di spinta**, a sinistra nel pannello (`G` gas / `F` freno, oppure `W` `S`): avanti e indietro.
+  Torna al centro quando la lasci.
+- **Cruscotto** sopra i comandi: strumenti a lancetta per distanza, velocità di avvicinamento,
+  differenza di rotazione e di rollio e carburante (in verde i valori buoni per l'aggancio), uno schermo
+  a fosfori con lo scostamento dal centro e le spie SYNC, CENTRO, VELOCITÀ e RCS.
 - **Regolazioni sul pannello:** sensibilità (0,25–2×), movimento **ASSIST** (gli smorzatori fermano da
   soli gli spostamenti laterali e tengono l'avanzamento sotto 2 m/s; il rollio no) o **MANUAL** (inerzia pura), asse Y normale o
   invertito. Restano nel browser.

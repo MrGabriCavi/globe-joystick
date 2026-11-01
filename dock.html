@@ -17,7 +17,9 @@
     --amber: #ffb000;
     --green: #39ff7a;
     --cyan: #4fe3ff;
-    --stick: clamp(130px, min(36vw, 30vh), 220px);
+    --stick: clamp(120px, min(32vw, 24vh), 200px);
+    --gauge: clamp(56px, 14.5vw, 108px);
+    --cy: 50%;   /* centro della vista, sopra la console (layout() in JS) */
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -46,27 +48,53 @@
     font-size: 7px; color: var(--ink); text-decoration: none; border: 1px solid #3a3a44; background: #16161c;
   }
   .back:hover { border-color: var(--amber); color: var(--amber); }
-  .tele {
-    position: fixed; pointer-events: none; text-align: right;
-    top: calc(14px + env(safe-area-inset-top)); right: calc(16px + env(safe-area-inset-right));
-    display: grid; grid-template-columns: auto auto; gap: 7px 12px; font-size: 8px;
-    padding: 12px 14px; border-radius: 12px; background: rgba(8,9,12,.72); border: 1px solid #22222a;
+  /* Cruscotto sopra i comandi, moderno-vintage: strumenti a lancetta con ghiera cromata e
+     tacche avorio, al centro uno "schermo a fosfori" per lo scostamento laterale, sotto le spie. */
+  .console {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    display: flex; flex-direction: column;
+    filter: drop-shadow(0 12px 30px rgba(0,0,0,.6));
   }
-  .tele dt { color: var(--dim); }
-  .tele dd { margin: 0; color: var(--green); min-width: 9ch; }
-  .tele dd.warn { color: var(--amber); }
-  .tele dd.bad { color: var(--red); }
-  .fuel { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: #1b1b22; overflow: hidden; }
-  #fuelBar { height: 100%; width: 100%; background: linear-gradient(90deg, var(--red), var(--amber) 30%, var(--green) 60%); }
+  .dash {
+    position: relative; padding: 16px 16px 10px; border-radius: 18px 18px 0 0;
+    border: 1px solid #2a2a33; border-bottom: 0;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
+      linear-gradient(#202027, #121217);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+  }
+  .dash::before {
+    content: ''; position: absolute; left: 18px; right: 18px; top: 0; height: 5px;
+    background: linear-gradient(90deg, var(--red) 0 33%, #ff7a00 33% 66%, #ffd000 66%);
+    border-radius: 0 0 4px 4px;
+  }
+  .instruments { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .gauge { width: var(--gauge); height: var(--gauge); display: block; filter: drop-shadow(0 3px 4px rgba(0,0,0,.6)); }
+  .gauge .tick { font: 7.5px system-ui, sans-serif; fill: #e9e2cf; text-anchor: middle; }
+  .gauge .gname { font: 5.5px 'Press Start 2P', monospace; fill: #a39c8c; text-anchor: middle; }
+  .gauge .gread { font: 7px 'Press Start 2P', monospace; fill: var(--amber); text-anchor: middle; }
+  .scope { width: calc(var(--gauge) * 1.25); height: var(--gauge); display: block; filter: drop-shadow(0 3px 4px rgba(0,0,0,.6)); }
+  .scope text { font: 6px 'Press Start 2P', monospace; fill: #6dffcf; }
+  .lamps { display: flex; justify-content: center; gap: 6px; margin-top: 9px; }
+  .lamp {
+    min-width: 62px; padding: 5px 6px; border-radius: 4px; text-align: center;
+    font-size: 6px; letter-spacing: 1px; color: #3d3d44;
+    background: linear-gradient(#141418, #0c0c0f); border: 1px solid #2a2a31;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.8);
+  }
+  .lamp.ok { color: #032; background: linear-gradient(#5dff97, #22c75a); box-shadow: 0 0 10px rgba(57,255,122,.55); border-color: #6dffa4; }
+  .lamp.warn { color: #2a1800; background: linear-gradient(#ffd055, #e09400); box-shadow: 0 0 10px rgba(255,176,0,.5); border-color: #ffd36a; }
+  .lamp.bad { color: #fff; background: linear-gradient(#ff5a5a, #c40d0d); box-shadow: 0 0 12px rgba(255,42,42,.6); border-color: #ff8080; }
 
   /* Mirino al centro (asse della navetta) e segno del portello */
-  .reticle { position: fixed; left: 50%; top: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; pointer-events: none; }
+  .reticle { position: fixed; left: 50%; top: var(--cy); width: 84px; height: 84px; margin: -42px 0 0 -42px; pointer-events: none; }
   .port-mark {
     position: fixed; width: 18px; height: 18px; margin: -9px 0 0 -9px; pointer-events: none;
     border: 2px solid var(--cyan); transform: rotate(45deg); box-shadow: 0 0 8px rgba(79,227,255,.6);
   }
   .msg {
-    position: fixed; left: 50%; top: calc(50% + 62px); transform: translateX(-50%); pointer-events: none;
+    position: fixed; left: 50%; top: calc(var(--cy) + 52px); transform: translateX(-50%); pointer-events: none;
     font-size: 10px; color: var(--amber); text-shadow: 0 0 8px rgba(255,176,0,.6); white-space: nowrap;
   }
 
@@ -105,21 +133,15 @@
 
   /* Pannello comandi, come quello del globo */
   .deck {
-    position: fixed; left: 50%; transform: translateX(-50%);
-    bottom: calc(16px + env(safe-area-inset-bottom));
-    display: flex; align-items: center; gap: 16px;
-    padding: 22px 18px 18px;
+    position: relative; display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 20px 18px 18px;
     background: linear-gradient(#18181e, #09090c);
-    border: 1px solid #2a2a33; border-radius: 18px;
-    box-shadow: 0 12px 40px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.06);
+    border: 1px solid #2a2a33; border-top: 2px solid #050507; border-radius: 0 0 18px 18px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
     touch-action: none;
   }
-  .deck::before {
-    content: ''; position: absolute; left: 18px; right: 18px; top: 0; height: 5px;
-    background: linear-gradient(90deg, var(--red) 0 33%, #ff7a00 33% 66%, #ffd000 66%);
-    border-radius: 0 0 4px 4px;
-  }
-  .deck::after { content: 'PILOT'; position: absolute; left: 22px; top: 10px; font-size: 6px; color: #4a4a55; letter-spacing: 1px; }
+  .deck::after { content: 'PILOT'; position: absolute; left: 22px; top: 7px; font-size: 6px; color: #4a4a55; letter-spacing: 1px; }
+  .keys { font-size: 6px; color: #55555f; }
   .lbl { font-size: 6px; color: var(--dim); text-align: center; }
 
   /* Regolazioni: sensibilità (cursore) e movimento (ASSIST/MANUAL) */
@@ -167,10 +189,16 @@
   }
 
   @media (max-aspect-ratio: 1/1) {
-    .deck { left: 0; right: 0; transform: none; bottom: 0; justify-content: space-evenly; gap: 4px;
-      padding: 22px 6px calc(14px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; border-bottom: 0; }
+    .console { left: 0; right: 0; transform: none; bottom: 0; }
+    .dash { padding: 14px 6px 8px; }
+    .instruments { gap: 3px; }
+    .gauge .tick { display: none; }   /* troppo piccoli per leggerli: restano tacche e valore */
+    .gauge .gname { font-size: 7px; }
+    .gauge .gread { font-size: 9px; }
+    .lamp { min-width: 0; flex: 1; }
+    .deck { justify-content: space-evenly; gap: 4px; border-radius: 0; border-bottom: 0;
+      padding: 18px 6px calc(14px + env(safe-area-inset-bottom)); }
     .settings { width: 70px; gap: 10px; }
-    .tele { font-size: 7px; padding: 10px; gap: 5px 8px; top: calc(96px + env(safe-area-inset-top)); }
     .arcade { width: 42px; height: 42px; }
     .lever { width: 32px; }
   }
@@ -188,16 +216,21 @@
   <a class="back" href="index.html" data-i18n="back">← GLOBO</a>
 </header>
 
-<dl class="tele" id="tele">
-  <dt data-i18n="tDist">DISTANZA</dt><dd id="tDist">—</dd>
-  <dt data-i18n="tSpeed">AVVICIN.</dt><dd id="tSpeed">—</dd>
-  <dt data-i18n="tLat">LATERALE</dt><dd id="tLat">—</dd>
-  <dt data-i18n="tRoll">ROLLIO Δ</dt><dd id="tRoll">—</dd>
-  <dt data-i18n="tRate">ROTAZ. Δ</dt><dd id="tRate">—</dd>
-  <dt data-i18n="tTime">TEMPO</dt><dd id="tTime">—</dd>
-  <dt data-i18n="tFuel">RCS</dt><dd id="tFuel">—</dd>
-  <div class="fuel"><div id="fuelBar"></div></div>
-</dl>
+<!-- Sfumature degli strumenti del cruscotto -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="chrome" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4f4f6"/><stop offset=".35" stop-color="#7a7a82"/>
+      <stop offset=".6" stop-color="#e2e2e6"/><stop offset="1" stop-color="#3e3e44"/>
+    </linearGradient>
+    <radialGradient id="face" cx=".5" cy=".42" r=".6">
+      <stop offset="0" stop-color="#1c1e1f"/><stop offset="1" stop-color="#060707"/>
+    </radialGradient>
+    <radialGradient id="phosphor" cx=".5" cy=".5" r=".7">
+      <stop offset="0" stop-color="#062a22"/><stop offset="1" stop-color="#010806"/>
+    </radialGradient>
+  </defs>
+</svg>
 
 <svg class="reticle" viewBox="-42 -42 84 84" aria-hidden="true">
   <g fill="none" stroke="#39ff7a" stroke-width="1.6" opacity=".85">
@@ -234,7 +267,22 @@
   </div>
 </div>
 
+<div class="console" id="console">
+<div class="dash" id="dash">
+  <div class="instruments" id="instruments"></div>
+  <div class="lamps">
+    <span class="lamp" id="lSync" data-i18n="aSync">SYNC</span>
+    <span class="lamp" id="lCenter" data-i18n="aCenter">CENTRO</span>
+    <span class="lamp" id="lSpeed" data-i18n="aSpeed">VELOC.</span>
+    <span class="lamp" id="lRcs">RCS</span>
+  </div>
+</div>
 <section class="deck" id="deck">
+  <div class="lever-wrap">
+    <div class="lever" id="lever" role="slider" aria-valuemin="-1" aria-valuemax="1" data-i18n-aria="thrustAria" aria-label="Spinta"><div class="knob" id="knob"></div></div>
+    <span class="lbl" data-i18n="thrust">SPINTA</span>
+    <span class="keys">G▲ F▼</span>
+  </div>
   <div class="settings">
     <div class="sens">
       <span class="lbl" data-i18n="sens">SENSIBILITÀ</span>
@@ -248,15 +296,12 @@
     <canvas id="stick" role="application" data-i18n-aria="stickAria" aria-label="Spostamento laterale"></canvas>
     <span class="lbl" data-i18n="stickLbl">LATERALE</span>
   </div>
-  <div class="lever-wrap">
-    <div class="lever" id="lever" role="slider" aria-valuemin="-1" aria-valuemax="1" data-i18n-aria="thrustAria" aria-label="Spinta"><div class="knob" id="knob"></div></div>
-    <span class="lbl" data-i18n="thrust">SPINTA</span>
-  </div>
   <div class="rollpad">
     <div class="btn"><button class="arcade" id="rollL" data-i18n-aria="rollL" aria-label="Rollio antiorario">↺</button>ROLL</div>
     <div class="btn"><button class="arcade" id="rollR" data-i18n-aria="rollR" aria-label="Rollio orario">↻</button>ROLL</div>
   </div>
 </section>
+</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -275,11 +320,12 @@ const $ = (id) => document.getElementById(id);
 const STR = {
   it: {
     back: '← GLOBO', start: '▶ INIZIA', retry: '↻ RIPROVA', levelsBtn: 'LIVELLI', startTitle: 'ATTRACCO ALLA ISS',
-    startText: 'La stazione gira attorno all\'asse del portello. Fai ruotare la navetta alla stessa velocità con i pulsanti <b>ROLL</b> (<kbd>Q</kbd> <kbd>E</kbd>): quando la stazione ti sembra ferma sei sincronizzato. Poi centra il portello nel mirino con la <b>cloche</b> (frecce) e avvicinati piano con la <b>leva di spinta</b> (<kbd>W</kbd> <kbd>S</kbd>).<br>All\'aggancio servono: centro entro 25 cm, meno di 0,35 m/s, rollio entro 5° e rotazione entro 3°/s.',
+    startText: 'La stazione gira attorno all\'asse del portello. Fai ruotare la navetta alla stessa velocità con i pulsanti <b>ROLL</b> (<kbd>Q</kbd> <kbd>E</kbd>): quando la stazione ti sembra ferma sei sincronizzato. Poi centra il portello nel mirino con la <b>cloche</b> (frecce) e avvicinati piano con la <b>leva di spinta</b> a sinistra (<kbd>G</kbd> avanti, <kbd>F</kbd> indietro, oppure <kbd>W</kbd> <kbd>S</kbd>).<br>All\'aggancio servono: centro entro 25 cm, meno di 0,35 m/s, rollio entro 5° e rotazione entro 3°/s.',
     sens: 'SENSIBILITÀ', mode: 'MOVIMENTO', invert: 'ASSE Y', invNormal: 'NORMALE', invInverted: 'INVERTITO',
     stickLbl: 'LATERALE', thrust: 'SPINTA', stickAria: 'Spostamento laterale', thrustAria: 'Spinta avanti e indietro',
     rollL: 'Rollio antiorario', rollR: 'Rollio orario',
-    tDist: 'DISTANZA', tSpeed: 'AVVICIN.', tLat: 'LATERALE', tRoll: 'ROLLIO Δ', tRate: 'ROTAZ. Δ', tTime: 'TEMPO', tFuel: 'RCS',
+    gDist: 'DIST m', gSpeed: 'VEL m/s', gSpin: 'ROT Δ°/s', gRoll: 'ROLL Δ°', gFuel: 'RCS %', gLat: 'LATERALE',
+    aSync: 'SYNC', aCenter: 'CENTRO', aSpeed: 'VELOC.',
     lvCalm: 'FERMA', lvCalmD: 'La stazione non gira: impara i comandi.',
     lvSlow: 'LENTA', lvSlowD: '8°/s: un giro ogni 45 secondi.',
     lvFast: 'VELOCE', lvFastD: '25°/s: serve sincronizzarsi bene.',
@@ -292,11 +338,12 @@ const STR = {
   },
   en: {
     back: '← GLOBE', start: '▶ START', retry: '↻ RETRY', levelsBtn: 'LEVELS', startTitle: 'DOCKING WITH THE ISS',
-    startText: 'The station spins around the axis of its docking port. Spin your ship at the same rate with the <b>ROLL</b> buttons (<kbd>Q</kbd> <kbd>E</kbd>): when the station looks still you are synchronized. Then center the port in the reticle with the <b>stick</b> (arrow keys) and close in slowly with the <b>thrust lever</b> (<kbd>W</kbd> <kbd>S</kbd>).<br>To latch you need: centered within 25 cm, under 0.35 m/s, roll within 5° and spin within 3°/s.',
+    startText: 'The station spins around the axis of its docking port. Spin your ship at the same rate with the <b>ROLL</b> buttons (<kbd>Q</kbd> <kbd>E</kbd>): when the station looks still you are synchronized. Then center the port in the reticle with the <b>stick</b> (arrow keys) and close in slowly with the <b>thrust lever</b> on the left (<kbd>G</kbd> forward, <kbd>F</kbd> back, or <kbd>W</kbd> <kbd>S</kbd>).<br>To latch you need: centered within 25 cm, under 0.35 m/s, roll within 5° and spin within 3°/s.',
     sens: 'SENSITIVITY', mode: 'MOVEMENT', invert: 'Y AXIS', invNormal: 'NORMAL', invInverted: 'INVERTED',
     stickLbl: 'LATERAL', thrust: 'THRUST', stickAria: 'Lateral translation', thrustAria: 'Forward and back thrust',
     rollL: 'Roll counterclockwise', rollR: 'Roll clockwise',
-    tDist: 'RANGE', tSpeed: 'CLOSING', tLat: 'LATERAL', tRoll: 'ROLL Δ', tRate: 'SPIN Δ', tTime: 'TIME', tFuel: 'RCS',
+    gDist: 'RANGE m', gSpeed: 'SPEED m/s', gSpin: 'SPIN Δ°/s', gRoll: 'ROLL Δ°', gFuel: 'RCS %', gLat: 'LATERAL',
+    aSync: 'SYNC', aCenter: 'CENTER', aSpeed: 'SPEED',
     lvCalm: 'STILL', lvCalmD: 'The station is not spinning: learn the controls.',
     lvSlow: 'SLOW', lvSlowD: '8°/s: one turn every 45 seconds.',
     lvFast: 'FAST', lvFastD: '25°/s: you need a good sync.',
@@ -489,13 +536,21 @@ scene.add(station);
   add(new THREE.BoxGeometry(8, 0.1, 22), solar, 0, -3, -36);   // pannelli del segmento russo
 }
 
+// La console copre la parte bassa: il centro della vista (asse della navetta, mirino) va a metà
+// dello spazio libero sopra di lei, spostando la proiezione come fa il globo.
 function layout() {
   const w = window.innerWidth, h = window.innerHeight;
+  const cy = Math.max(h * 0.25, $('console').getBoundingClientRect().top / 2);
   renderer.setSize(w, h, false);
-  camera.aspect = bgCam.aspect = w / h;
-  camera.updateProjectionMatrix(); bgCam.updateProjectionMatrix();
+  for (const cam of [camera, bgCam]) {
+    cam.aspect = w / h;
+    cam.setViewOffset(w, h, 0, h / 2 - cy, w, h);
+    cam.updateProjectionMatrix();
+  }
+  document.documentElement.style.setProperty('--cy', cy + 'px');
 }
 window.addEventListener('resize', layout);
+new ResizeObserver(layout).observe($('console'));
 layout();
 
 // ---------------------------------------------------------------- cloche (laterale)
@@ -702,18 +757,18 @@ for (const [id, dir] of [['rollL', 1], ['rollR', -1]]) {   // antiorario = rolli
 }
 const rollOut = () => roll.btn || roll.keys;
 
-// Tastiera: frecce = laterale, W/S = spinta, Q/E = rollio, Invio = inizia/riprova
+// Tastiera: frecce = laterale, G/F o W/S = spinta (G come gas, F come freno), Q/E = rollio, Invio = inizia/riprova
 const KEYMAP = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 const held = new Set();
 function syncKeys() {
-  thr.keys = (held.has('KeyW') ? 1 : 0) - (held.has('KeyS') ? 1 : 0);
+  thr.keys = (held.has('KeyW') || held.has('KeyG') ? 1 : 0) - (held.has('KeyS') || held.has('KeyF') ? 1 : 0);
   roll.keys = (held.has('KeyQ') ? 1 : 0) - (held.has('KeyE') ? 1 : 0);
 }
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('input')) return;
   const k = KEYMAP[e.code];
   if (k) { e.preventDefault(); joy.keys.add(k); return; }
-  if (['KeyW', 'KeyS', 'KeyQ', 'KeyE'].includes(e.code)) { held.add(e.code); syncKeys(); return; }
+  if (['KeyW', 'KeyS', 'KeyG', 'KeyF', 'KeyQ', 'KeyE'].includes(e.code)) { held.add(e.code); syncKeys(); return; }
   if (e.code === 'Enter' && !st.running) start();
 });
 window.addEventListener('keyup', (e) => {
@@ -791,28 +846,101 @@ $('btnStart').addEventListener('click', start);
 $('btnRetry').addEventListener('click', start);
 $('btnLevels').addEventListener('click', () => { $('endScreen').hidden = true; $('startScreen').hidden = false; });
 
-// ---------------------------------------------------------------- HUD
-const portMark = $('portMark'), proj = new THREE.Vector3();
-function setVal(id, text, level) {
-  const el = $(id);
-  if (el.textContent !== text) el.textContent = text;
-  el.className = level || '';
+// ---------------------------------------------------------------- cruscotto
+// Strumenti a lancetta in SVG (0° in alto, senso orario) e uno schermo a fosfori per lo
+// scostamento laterale. Le lancette inseguono il valore con un po' di inerzia, come quelle vere.
+const SVGNS = 'http://www.w3.org/2000/svg';
+const svgEl = (tag, attrs, parent) => {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  parent?.append(e);
+  return e;
+};
+const polar = (r, a) => [r * Math.sin(a * DEG), -r * Math.cos(a * DEG)];
+const arcPath = (r, a0, a1) => {
+  const [x0, y0] = polar(r, a0), [x1, y1] = polar(r, a1);
+  return `M${x0} ${y0}A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+};
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const GREEN = '#39ff7a', AMBER = '#ffb000', RED = '#ff3b3b';
+function makeGauge(parent, { name, ticks, zones = [], toAngle, tickText = (v) => String(v), wrap = false }) {
+  const svg = svgEl('svg', { viewBox: '-50 -50 100 100', class: 'gauge' }, parent);
+  svgEl('circle', { r: 49, fill: 'url(#chrome)' }, svg);
+  svgEl('circle', { r: 44.5, fill: 'url(#face)' }, svg);
+  for (const [a, b, color] of zones) {
+    svgEl('path', { d: arcPath(38.5, toAngle(a), toAngle(b)), stroke: color, 'stroke-width': 4, fill: 'none', opacity: 0.8 }, svg);
+  }
+  for (const v of ticks) {
+    const a = toAngle(v), [x0, y0] = polar(42, a), [x1, y1] = polar(34.5, a), [tx, ty] = polar(26, a);
+    svgEl('line', { x1: x0, y1: y0, x2: x1, y2: y1, stroke: '#e9e2cf', 'stroke-width': 1.6 }, svg);
+    svgEl('text', { x: tx, y: ty + 2.6, class: 'tick' }, svg).textContent = tickText(v);
+  }
+  svgEl('text', { x: 0, y: 10, class: 'gname' }, svg).textContent = t(name);
+  const read = svgEl('text', { x: 0, y: 31, class: 'gread' }, svg);
+  const needle = svgEl('g', {}, svg);
+  svgEl('path', { d: 'M-2.2 7 L0 -39 L2.2 7 Z', fill: '#ff6a1a' }, needle);
+  svgEl('circle', { r: 4.6, fill: 'url(#chrome)' }, svg);
+  svgEl('ellipse', { cx: 0, cy: -22, rx: 31, ry: 15, fill: '#fff', opacity: 0.05 }, svg);   // riflesso del vetro
+  return { read, needle, toAngle, wrap, a: toAngle(ticks[0]) };
 }
-function updateHud() {
+function setGauge(gz, value, text, dt) {
+  const target = gz.toAngle(value);
+  let d = target - gz.a;
+  if (gz.wrap) d = ((d + 540) % 360) - 180;   // strumento a giro completo: la via più corta
+  gz.a += d * (1 - Math.exp(-dt * 10));
+  gz.needle.setAttribute('transform', `rotate(${gz.a.toFixed(2)})`);
+  if (gz.read.textContent !== text) gz.read.textContent = text;
+}
+const sweep = (lo, hi, k = (v) => v) => (v) => -135 + 270 * (k(clamp(v, lo, hi)) - k(lo)) / (k(hi) - k(lo));
+const inst = $('instruments');
+const gz = {
+  dist: makeGauge(inst, { name: 'gDist', ticks: [0, 5, 10, 25, 50, 100], toAngle: sweep(0, 100, Math.sqrt), zones: [[0, 2, GREEN]] }),
+  speed: makeGauge(inst, { name: 'gSpeed', ticks: [-0.5, 0, 0.5, 1, 1.5, 2], toAngle: sweep(-0.5, 2),
+    zones: [[-0.5, 0, AMBER], [0, TOL.speed, GREEN], [TOL.speed, 1, AMBER], [1, 2, RED]], tickText: (v) => fmt(v, v % 1 ? 1 : 0) }),
+};
+// Schermo a fosfori: il punto è la navetta rispetto all'asse del portello, nel riferimento dello
+// schermo; scala compressa (r = d / (d + 0,6 m)) per vedere sia i metri sia i centimetri.
+const scope = svgEl('svg', { viewBox: '-62 -50 124 100', class: 'scope' }, inst);
+svgEl('rect', { x: -61, y: -49, width: 122, height: 98, rx: 10, fill: 'url(#chrome)' }, scope);
+svgEl('rect', { x: -56, y: -44, width: 112, height: 88, rx: 7, fill: 'url(#phosphor)' }, scope);
+for (const r of [12, 24, 36]) svgEl('circle', { r, fill: 'none', stroke: '#0f4a3b', 'stroke-width': 0.8 }, scope);
+svgEl('path', { d: 'M-54 0H54M0 -42V42', stroke: '#16705a', 'stroke-width': 0.8 }, scope);
+const SCOPE_R = (d) => 40 * d / (d + 0.6);
+svgEl('circle', { r: SCOPE_R(TOL.lat), fill: 'rgba(57,255,122,.08)', stroke: '#39ff7a', 'stroke-width': 0.8, 'stroke-dasharray': '2 2' }, scope);
+const scopeName = svgEl('text', { x: -52, y: -35 }, scope);
+scopeName.textContent = t('gLat');
+const scopeTime = svgEl('text', { x: 52, y: -35, 'text-anchor': 'end' }, scope);
+const scopeRead = svgEl('text', { x: 0, y: 40, 'text-anchor': 'middle' }, scope);
+const scopeDot = svgEl('circle', { r: 3.2, fill: '#b6ffe9', style: 'filter: drop-shadow(0 0 3px #4dffc4)' }, scope);
+gz.spin = makeGauge(inst, { name: 'gSpin', ticks: [-20, -10, 0, 10, 20], toAngle: (v) => 135 * clamp(v, -20, 20) / 20,
+  zones: [[-TOL.rate, TOL.rate, GREEN]] });
+gz.roll = makeGauge(inst, { name: 'gRoll', ticks: [0, 90, 180, -90], toAngle: (v) => v, wrap: true,
+  zones: [[-TOL.roll, TOL.roll, GREEN]], tickText: (v) => (v === 180 ? '' : String(v)) });
+gz.fuel = makeGauge(inst, { name: 'gFuel', ticks: [0, 25, 50, 75, 100], toAngle: sweep(0, 100),
+  zones: [[0, 20, RED], [20, 40, AMBER], [40, 100, GREEN]] });
+const setLamp = (id, state) => { const l = $(id); if (l.className !== 'lamp ' + state) l.className = 'lamp ' + state; };
+
+const portMark = $('portMark'), proj = new THREE.Vector3();
+function updateHud(dt) {
   if (!st.running) return;
-  const e = errors();
-  const near = st.z < 15;
-  setVal('tDist', fmt(st.z, 1) + ' m');
-  setVal('tSpeed', fmt(e.speed, 2) + ' m/s', e.speed < 0 ? 'warn' : near && e.speed > TOL.speed ? 'bad' : '');
+  const e = errors(), near = st.z < 15, lvl = (good) => (good ? 'ok' : near ? 'bad' : 'warn');
+  const dRoll = wrapPi(st.tRoll - st.roll) / DEG, dRate = (st.tRate - st.rollRate) / DEG;
+  setGauge(gz.dist, st.z, fmt(st.z, st.z < 10 ? 1 : 0), dt);
+  setGauge(gz.speed, e.speed, fmt(Math.abs(e.speed) < 0.005 ? 0 : e.speed, 2), dt);   // niente "-0,00" da fermi
+  setGauge(gz.spin, dRate, fmt(dRate, 1), dt);
+  setGauge(gz.roll, dRoll, fmt(dRoll, 0) + '°', dt);
+  setGauge(gz.fuel, st.fuel, fmt(st.fuel), dt);
   // Scostamento nel riferimento della navetta: + a destra/in alto sullo schermo
   const c = Math.cos(st.roll), sn = Math.sin(st.roll);
-  const lx = c * st.x + sn * st.y, ly = -sn * st.x + c * st.y;
-  setVal('tLat', `${lx >= 0 ? '+' : ''}${fmt(lx, 2)} ${ly >= 0 ? '+' : ''}${fmt(ly, 2)}`, e.lat > TOL.lat ? (near ? 'bad' : 'warn') : '');
-  setVal('tRoll', fmt(wrapPi(st.tRoll - st.roll) / DEG, 1) + '°', e.roll > TOL.roll ? (near ? 'bad' : 'warn') : '');
-  setVal('tRate', fmt((st.tRate - st.rollRate) / DEG, 1) + '°/s', e.rate > TOL.rate ? (near ? 'bad' : 'warn') : '');
-  setVal('tTime', fmt(st.time, 1) + ' s');
-  setVal('tFuel', fmt(st.fuel) + '%', st.fuel < 20 ? 'bad' : st.fuel < 40 ? 'warn' : '');
-  $('fuelBar').style.width = st.fuel.toFixed(1) + '%';
+  const lx = c * st.x + sn * st.y, ly = -sn * st.x + c * st.y, d = Math.hypot(lx, ly), k = d > 0 ? SCOPE_R(d) / d : 0;
+  scopeDot.setAttribute('cx', (lx * k).toFixed(2));
+  scopeDot.setAttribute('cy', (-ly * k).toFixed(2));
+  scopeRead.textContent = d < 1 ? `${fmt(d * 100)} cm` : `${fmt(d, 2)} m`;
+  scopeTime.textContent = fmt(st.time, 1) + 's';
+  setLamp('lSync', lvl(e.rate <= TOL.rate && e.roll <= TOL.roll));
+  setLamp('lCenter', lvl(e.lat <= TOL.lat));
+  setLamp('lSpeed', e.speed < 0 ? 'warn' : lvl(e.speed <= TOL.speed));
+  setLamp('lRcs', st.fuel > 40 ? 'ok' : st.fuel > 20 ? 'warn' : 'bad');
 
   // Segno sul portello, utile da lontano
   proj.set(0, 0, 0).project(camera);
@@ -852,7 +980,7 @@ function frame(now) {
   camera.position.set(st.x ?? 3, st.y ?? 2, st.z ?? 60);
   camera.rotation.set(0, 0, st.roll || 0);
   bgCam.rotation.set(0, 0, st.roll || 0);
-  updateHud();
+  updateHud(dt);
   renderer.clear();
   renderer.render(bgScene, bgCam);
   renderer.clearDepth();
