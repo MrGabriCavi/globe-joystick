@@ -26,6 +26,7 @@ da internet, quindi serve la connessione; offline il globo mostra una griglia.
 | Pulsante giallo, `M` | modalità **VOLA** (su = nord, destra = est) o **RUOTA** (muovi il globo come con la mano) |
 | Menu in alto a sinistra | gruppo di satelliti: più luminosi, stazioni, meteo, GPS, Galileo, geostazionari, Starlink |
 | ◎ SOPRA DI ME | chiede la posizione e mostra i satelliti del gruppo più alti di 10° sul tuo orizzonte (anelli azzurri ed elenco). La posizione precisa il browser la dà solo al file aperto dal PC o a pagine https: dal telefono via `avvia-server.ps1` (http) si può usare quella approssimativa dalla rete |
+| ✦ VAI A ISS, `I` | porta il globo sopra la Stazione spaziale internazionale e apre la sua schedina; se il gruppo scelto non la contiene passa a «Stazioni spaziali» |
 | Clic / tocco su un satellite | apre la schedina (con `Esc` o ✕ si chiude); CENTRA porta il globo sopra il satellite |
 
 ## Satelliti

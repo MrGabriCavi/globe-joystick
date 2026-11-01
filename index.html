@@ -81,6 +81,7 @@
   }
   .pill:hover { border-color: var(--amber); color: var(--amber); }
   .overhead-btn { pointer-events: auto; color: #4fe3ff; border-color: #22505a; }
+  .iss-btn { pointer-events: auto; color: var(--green); border-color: #1f5a35; }
   .card-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
   .card-list p { margin: 0 0 4px; font: 13px/1.45 system-ui, sans-serif; color: #c9c7c0; }
   .card-list .pill { align-self: flex-start; }
@@ -163,8 +164,8 @@
     .hint { display: none; }
     .card {
       right: calc(12px + env(safe-area-inset-right));
-      top: calc(128px + env(safe-area-inset-top)); width: min(400px, calc(100vw - 24px));
-      max-height: min(calc(100dvh - var(--stick) - 200px), 42dvh);
+      top: calc(var(--hud-bottom, 128px) + 10px); width: min(400px, calc(100vw - 24px));
+      max-height: min(calc(100dvh - var(--stick) - var(--hud-bottom, 128px) - 82px), 42dvh);
     }
     .card-img { height: 90px; }
   }
@@ -192,6 +193,7 @@
   <div class="satbar">
     <select id="group" aria-label="Gruppo di satelliti"></select>
     <button class="pill overhead-btn" id="btnOverhead">◎ SOPRA DI ME</button>
+    <button class="pill iss-btn" id="btnIss">✦ VAI A ISS</button>
     <div class="satinfo" id="satinfo"></div>
   </div>
 </header>
@@ -523,6 +525,7 @@ window.addEventListener('keydown', (e) => {
   if (k) { e.preventDefault(); joy.keys.add(k); view.homing = null; }
   else if (e.code === 'KeyR') resetView();
   else if (e.code === 'KeyM') toggleMode();
+  else if (e.code === 'KeyI') goToIss();
   else if (e.code === 'Escape') selectSat(null);
 });
 window.addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) joy.keys.delete(k); });
@@ -1044,6 +1047,11 @@ function updateSelectedOrbit() {
 
 /* ---------- Schedina ---------- */
 const card = $('card');
+// Su telefono la schedina parte sotto l'HUD, che a seconda della larghezza va a capo.
+const hud = document.querySelector('.hud');
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--hud-bottom', hud.getBoundingClientRect().bottom + 'px');
+}).observe(hud);
 const OBJECT_TYPE = { PAY: 'Satellite', 'R/B': 'Stadio di razzo', DEB: 'Detrito', UNK: 'Sconosciuto' };
 const OPS_STATUS = {
   '+': 'Operativo', '-': 'Non operativo', P: 'Parzialmente operativo', B: 'Riserva', S: 'Scorta',
@@ -1303,6 +1311,23 @@ $('btnOverhead').addEventListener('click', async () => {
     renderOverheadCard(`Posizione precisa non disponibile: ${err.message}.`, true);
   }
 });
+
+/* ---------- Vai alla ISS ----------
+   Se nel gruppo scelto non c'è, passa alle stazioni spaziali. */
+const ISS_ID = 25544;
+async function goToIss() {
+  let iss = sats.list.find((s) => s.id === ISS_ID);
+  if (!iss) {
+    $('group').value = 'stations';
+    await loadGroup('stations');
+    iss = sats.list.find((s) => s.id === ISS_ID);
+  }
+  if (!iss || !iss.ok) { setStatus('ISS NON DISPONIBILE'); return; }
+  selectSat(iss);
+  view.homing = geoToView(iss.lat, iss.lon);
+  view.zoomTarget = 1.4;
+}
+$('btnIss').addEventListener('click', goToIss);
 
 // Menu dei gruppi
 {
