@@ -13,4 +13,22 @@ Write-Host ""
 Write-Host "  (se il telefono non si collega, consenti Python nel firewall di Windows per le reti private)"
 Write-Host ""
 
-python -m http.server $Port --bind 0.0.0.0 --directory $PSScriptRoot
+# Serve solo index.html: il resto della cartella (.git compreso) non è visibile dalla rete.
+$server = @'
+import functools, http.server, sys
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def send_head(self):
+        if self.path.split('?')[0] not in ('/', '/index.html'):
+            self.send_error(404)
+            return None
+        return super().send_head()
+
+port, root = int(sys.argv[1]), sys.argv[2]
+httpd = http.server.ThreadingHTTPServer(('0.0.0.0', port), functools.partial(Handler, directory=root))
+try:
+    httpd.serve_forever()
+except KeyboardInterrupt:
+    pass
+'@
+$server | python - $Port $PSScriptRoot

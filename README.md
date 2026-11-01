@@ -9,7 +9,7 @@ da internet, quindi serve la connessione; offline il globo mostra una griglia.
 
 - **Dal PC:** doppio clic su `index.html`.
 - **Dal telefono:** avvia il server locale e apri dal telefono l'indirizzo che stampa
-  (stessa rete Wi-Fi):
+  (stessa rete Wi-Fi). Il server mostra in rete solo `index.html`:
 
   ```powershell
   powershell -ExecutionPolicy Bypass -File .\avvia-server.ps1
@@ -30,11 +30,16 @@ da internet, quindi serve la connessione; offline il globo mostra una griglia.
 
 ## Satelliti
 
-- **Orbite:** elementi orbitali (TLE) da [CelesTrak](https://celestrak.org). Le posizioni sono calcolate
-  nel browser con SGP4 ([satellite.js](https://github.com/shashwatak/satellite-js)).
-- **Aggiornamento:** le posizioni si ricalcolano ogni **10 minuti** (`POSITION_REFRESH_MS`); il conto alla
-  rovescia è accanto al menu. I TLE si riscaricano al massimo ogni **2 ore** (`TLE_MAX_AGE_MS`) e restano in
-  cache nel browser: CelesTrak li aggiorna con quel ritmo e blocca chi scarica lo stesso gruppo più spesso.
+- **Orbite:** elementi orbitali in formato OMM (JSON) da [CelesTrak](https://celestrak.org). Non TLE: le
+  righe TLE non hanno posto per i numeri NORAD oltre 99999, già usati dai lanci recenti, e CelesTrak quei
+  satelliti in TLE non li pubblica. Le posizioni sono calcolate nel browser con SGP4
+  ([satellite.js](https://github.com/shashwatak/satellite-js)).
+- **Aggiornamento:** per i gruppi fino a 2000 satelliti (`LIVE_MAX`) le posizioni si ricalcolano **ogni
+  secondo** (accanto al menu: IN DIRETTA); per quelli più grandi, come Starlink, ogni **10 minuti**
+  (`POSITION_REFRESH_MS`), con il conto alla rovescia. Le orbite a puntini si ricalcolano ogni 10 minuti e
+  intanto girano con la Terra. Gli elementi orbitali si riscaricano al massimo ogni **2 ore**
+  (`GP_MAX_AGE_MS`) e restano in cache nel browser: CelesTrak li aggiorna con quel ritmo e blocca chi scarica
+  lo stesso gruppo più spesso.
 - **Orbite a puntini:** per tutti i satelliti del gruppo se sono al massimo 300, altrimenti (es. Starlink,
   geostazionari) solo per quello selezionato, in verde.
 - **Schedina:** quota, velocità, posizione, inclinazione, periodo, apogeo/perigeo ed età dei dati (calcolati);

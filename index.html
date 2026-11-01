@@ -517,6 +517,8 @@ const KEYMAP = {
   ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
 };
 window.addEventListener('keydown', (e) => {
+  // Le scorciatoie del browser (Ctrl+R…) e il menu dei gruppi restano ai loro tasti.
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('select, input, textarea')) return;
   const k = KEYMAP[e.code];
   if (k) { e.preventDefault(); joy.keys.add(k); view.homing = null; }
   else if (e.code === 'KeyR') resetView();
@@ -680,10 +682,12 @@ $('btnReset').addEventListener('click', resetView);
 $('btnMode').addEventListener('click', toggleMode);
 
 /* =========================================================================
-   Satelliti: elementi orbitali (TLE) da CelesTrak, posizioni calcolate qui
-   con SGP4 (satellite.js). Le posizioni si ricalcolano ogni 10 minuti; i TLE
-   si riscaricano al massimo ogni 2 ore (CelesTrak li aggiorna con quel ritmo
-   e blocca chi scarica lo stesso gruppo più spesso), con cache nel browser.
+   Satelliti: elementi orbitali (OMM, JSON) da CelesTrak, posizioni calcolate
+   qui con SGP4 (satellite.js). Le posizioni si ricalcolano ogni secondo per i
+   gruppi fino a LIVE_MAX satelliti, altrimenti ogni 10 minuti insieme alle
+   orbite; gli elementi si riscaricano al massimo ogni 2 ore (CelesTrak li
+   aggiorna con quel ritmo e blocca chi scarica lo stesso gruppo più spesso),
+   con cache nel browser.
    ========================================================================= */
 const GROUPS = {
   visual: 'Più luminosi',
@@ -695,13 +699,18 @@ const GROUPS = {
   starlink: 'Starlink',
 };
 const POSITION_REFRESH_MS = 10 * 60 * 1000;
-const TLE_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+const GP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+const LIVE_MAX = 2000;        // fino a qui le posizioni si ricalcolano ogni secondo
 const ORBIT_SAMPLES = 180;
 const ALL_ORBITS_MAX = 300;   // oltre, l'orbita si disegna solo per il satellite selezionato
 const MU = 398600.4418, R_EQ = 6378.137;
 
 const sats = {
-  group: null, list: [], selected: null, refreshedAt: 0, tleAt: 0, busy: false, error: '',
+  group: null, list: [], selected: null, busy: false, error: '',
+  refreshedAt: 0,   // ultimo aggiornamento completo (orbite comprese)
+  orbitGmst: 0,     // GMST con cui sono state calcolate le orbite
+  positionsAt: 0,   // ultime posizioni calcolate
+  gpAt: 0,          // data di download degli elementi orbitali
   observer: null,   // { lat, lon, source, accuracy } dopo "SOPRA DI ME"
   overhead: [],     // [{ s, el, az, range }] satelliti sopra l'orizzonte dell'osservatore
 };
@@ -762,21 +771,38 @@ function stationIconTexture() {
   return t;
 }
 const STATION_RE = /^(ISS|CSS)\b|TIANGONG|TIANHE/i;
-function pointsLayer(opts) {
+// Le orbite si calcolano a ogni aggiornamento completo, con il GMST di quel momento;
+// fra un aggiornamento e l'altro questo gruppo le ruota con la Terra, così restano
+// sotto i satelliti anche quando le posizioni si aggiornano ogni secondo.
+const orbitsLayer = new THREE.Group();
+satellitesLayer.add(orbitsLayer);
+function pointsLayer(opts, parent = satellitesLayer) {
   const p = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({
     sizeAttenuation: false, transparent: true, depthWrite: false, ...opts,
   }));
   p.frustumCulled = false;
-  satellitesLayer.add(p);
+  parent.add(p);
   return p;
 }
-const orbitDots = pointsLayer({ size: 2, color: 0x6fb8ff, opacity: 0.35 });
-const selOrbitDots = pointsLayer({ size: 3.5, color: 0x39ff7a, opacity: 0.95 });
+const orbitDots = pointsLayer({ size: 2, color: 0x6fb8ff, opacity: 0.35 }, orbitsLayer);
+const selOrbitDots = pointsLayer({ size: 3.5, color: 0x39ff7a, opacity: 0.95 }, orbitsLayer);
 const satDots = pointsLayer({ size: 24, map: satIconTexture(), alphaTest: 0.1 });
 const stationDots = pointsLayer({ size: 38, map: stationIconTexture(), alphaTest: 0.1 });
 const overheadRings = pointsLayer({ size: 36, color: 0x4fe3ff, map: dotTexture(true), opacity: 0.85 });
 const selRing = pointsLayer({ size: 42, color: 0x39ff7a, map: dotTexture(true) });
-const setPositions = (points, arr) => points.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+// Stessa lunghezza: riscrive il buffer esistente. Altrimenti geometria nuova, liberando
+// quella vecchia: three.js libera il buffer WebGL di un attributo solo con dispose().
+function setPositions(points, arr) {
+  const attr = points.geometry.getAttribute('position');
+  if (attr && attr.array.length === arr.length) {
+    attr.array.set(arr);
+    attr.needsUpdate = true;
+    return;
+  }
+  points.geometry.dispose();
+  points.geometry = new THREE.BufferGeometry();
+  points.geometry.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+}
 
 // Terra-fissa (ECF, km) -> scena: x verso lon 0, y verso il polo nord, est verso -z.
 const ecfToScene = (p, out) => out.set(p.x, p.z, -p.y).divideScalar(EARTH_RADIUS_KM);
@@ -787,46 +813,45 @@ function propagate(satrec, date) {
   return pv;
 }
 
-function parseTle(text) {
-  const lines = text.split(/\r?\n/).map((l) => l.trimEnd()).filter(Boolean);
+// Formato OMM e non TLE: le righe TLE non hanno posto per i numeri NORAD oltre 99999,
+// già usati dai lanci recenti, e CelesTrak quei satelliti in TLE non li pubblica.
+// In cache solo i campi che servono, come righe di valori: un terzo dello spazio del JSON.
+const GP_FIELDS = [
+  'OBJECT_NAME', 'OBJECT_ID', 'NORAD_CAT_ID', 'EPOCH', 'MEAN_MOTION', 'ECCENTRICITY', 'INCLINATION',
+  'RA_OF_ASC_NODE', 'ARG_OF_PERICENTER', 'MEAN_ANOMALY', 'BSTAR', 'MEAN_MOTION_DOT', 'MEAN_MOTION_DDOT',
+];
+const STATION_EXCLUDE_RE = /\b(DEB|R\/B)\b/i;   // detriti e stadi di razzo "ISS DEB", "CSS R/B"…
+
+function parseGp(rows) {
   const out = [];
-  for (let i = 0; i < lines.length - 1; i++) {
-    const l1 = lines[i], l2 = lines[i + 1];
-    if (!l1.startsWith('1 ') || !l2.startsWith('2 ')) continue;
-    const name = i > 0 && !lines[i - 1].startsWith('2 ') ? lines[i - 1].trim() : 'NORAD ' + l1.slice(2, 7).trim();
+  for (const row of rows) {
+    const omm = Object.fromEntries(GP_FIELDS.map((k, i) => [k, row[i]]));
+    const name = omm.OBJECT_NAME || 'NORAD ' + omm.NORAD_CAT_ID;
     try {
       out.push({
-        name, id: parseInt(l1.slice(2, 7), 10), cospar: cosparFromTle(l1), epoch: epochFromTle(l1),
-        isStation: STATION_RE.test(name),
-        satrec: sat.twoline2satrec(l1, l2),
+        name, id: omm.NORAD_CAT_ID, cospar: omm.OBJECT_ID || '',
+        epoch: new Date(omm.EPOCH.endsWith('Z') ? omm.EPOCH : omm.EPOCH + 'Z'),
+        isStation: STATION_RE.test(name) && !STATION_EXCLUDE_RE.test(name),
+        satrec: sat.json2satrec(omm),
         pos: new THREE.Vector3(), ok: false, lat: 0, lon: 0, alt: 0, speed: 0,
       });
-    } catch { /* TLE malformato: lo salto */ }
-    i++;
+    } catch { /* elementi malformati: li salto */ }
   }
   return out;
 }
-function cosparFromTle(l1) {
-  const s = l1.slice(9, 17).trim();            // es. "98067A" -> "1998-067A"
-  if (s.length < 5) return '';
-  const yy = +s.slice(0, 2);
-  return (yy < 57 ? 2000 + yy : 1900 + yy) + '-' + s.slice(2);
-}
-function epochFromTle(l1) {
-  const yy = +l1.slice(18, 20), doy = parseFloat(l1.slice(20, 32));
-  return new Date(Date.UTC(yy < 57 ? 2000 + yy : 1900 + yy, 0, 1) + (doy - 1) * 86400000);
-}
 
-async function fetchTle(group) {
-  const key = 'tle:' + group;
+async function fetchGp(group) {
+  const key = 'gp:' + group;
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem(key)); } catch { /* storage non disponibile */ }
-  if (cached && Date.now() - cached.t < TLE_MAX_AGE_MS) return cached;
+  if (cached && Date.now() - cached.t < GP_MAX_AGE_MS) return cached;
   try {
-    const res = await fetch(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${encodeURIComponent(group)}&FORMAT=tle`);
+    const res = await fetch(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${encodeURIComponent(group)}&FORMAT=json`);
     const text = await res.text();
-    if (!res.ok || !/\n1 /.test(text)) throw new Error(text.slice(0, 120) || 'HTTP ' + res.status);
-    const data = { t: Date.now(), text };
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* agli errori CelesTrak risponde con testo semplice */ }
+    if (!res.ok || !Array.isArray(json) || !json.length) throw new Error(text.slice(0, 120) || 'HTTP ' + res.status);
+    const data = { t: Date.now(), rows: json.map((o) => GP_FIELDS.map((k) => o[k])) };
     try { localStorage.setItem(key, JSON.stringify(data)); } catch { /* cache piena: pazienza */ }
     return data;
   } catch (err) {
@@ -834,6 +859,10 @@ async function fetchTle(group) {
     throw err;
   }
 }
+// Cache del vecchio formato TLE: non serve più e occupa spazio.
+try {
+  for (const k of Object.keys(localStorage)) if (k.startsWith('tle:')) localStorage.removeItem(k);
+} catch { /* storage non disponibile */ }
 
 // Orbita "fotografata" adesso: punti lungo un periodo, tutti ruotati con il GMST
 // attuale, così l'ellisse è chiusa e il satellite ci sta sopra.
@@ -852,8 +881,11 @@ function orbitBuffer(list, now, gmst) {
   return out.subarray(0, k);
 }
 
-function refreshPositions() {
-  const now = new Date(), gmst = sat.gstime(now);
+const isLive = () => sats.list.length <= LIVE_MAX;
+
+// Posizioni attuali: icone, anello della selezione, "sopra di me".
+function updatePositions(now = new Date()) {
+  const gmst = sat.gstime(now);
   const arr = [], stationArr = [];
   sats.list.forEach((s) => {
     const pv = propagate(s.satrec, now);
@@ -871,12 +903,22 @@ function refreshPositions() {
   });
   setPositions(satDots, new Float32Array(arr));
   setPositions(stationDots, new Float32Array(stationArr));
-  satDots.material.size = sats.list.length > 1000 ? 12 : 24;   // con migliaia di satelliti (Starlink) icone più piccole
-  const live = sats.list.filter((s) => s.ok);
-  setPositions(orbitDots, live.length <= ALL_ORBITS_MAX ? orbitBuffer(live, now, gmst) : new Float32Array(0));
-  sats.refreshedAt = now.getTime();
+  orbitsLayer.rotation.y = sats.orbitGmst - gmst;   // la Terra è girata dal calcolo delle orbite
+  sats.positionsAt = now.getTime();
   updateSelection();
   updateOverhead();
+}
+
+// Aggiornamento completo: posizioni e orbite.
+function refreshPositions() {
+  const now = new Date();
+  sats.refreshedAt = now.getTime();
+  sats.orbitGmst = sat.gstime(now);
+  updatePositions(now);
+  satDots.material.size = sats.list.length > 1000 ? 12 : 24;   // con migliaia di satelliti (Starlink) icone più piccole
+  const live = sats.list.filter((s) => s.ok);
+  setPositions(orbitDots, live.length <= ALL_ORBITS_MAX ? orbitBuffer(live, now, sats.orbitGmst) : new Float32Array(0));
+  updateSelectedOrbit();
 }
 
 async function loadGroup(group) {
@@ -891,10 +933,10 @@ async function loadGroup(group) {
   try { localStorage.setItem('group', group); } catch { /* ok */ }
   updateSatInfo();
   try {
-    const data = await fetchTle(group);
+    const data = await fetchGp(group);
     if (sats.group !== group) return;   // nel frattempo è stato scelto un altro gruppo
-    sats.list = parseTle(data.text);
-    sats.tleAt = data.t;
+    sats.list = parseGp(data.rows);
+    sats.gpAt = data.t;
     refreshPositions();
     fitZoomToGroup();
   } catch (err) {
@@ -912,25 +954,28 @@ function fitZoomToGroup() {
   view.zoomTarget = r > 1.6 ? Math.max(0.12, 0.85 / r) : Math.max(view.zoom, 0.8);
 }
 
+// Ogni secondo: posizioni dei gruppi piccoli; ogni 10 minuti: aggiornamento completo.
 async function tick() {
   if (sats.list.length && !sats.busy && Date.now() - sats.refreshedAt >= POSITION_REFRESH_MS) {
     sats.busy = true;
     try {
-      if (Date.now() - sats.tleAt >= TLE_MAX_AGE_MS) {
+      if (Date.now() - sats.gpAt >= GP_MAX_AGE_MS) {
         const group = sats.group;
-        const data = await fetchTle(group).catch(() => null);
-        if (data && data.t !== sats.tleAt && sats.group === group) {
+        const data = await fetchGp(group).catch(() => null);
+        if (data && data.t !== sats.gpAt && sats.group === group) {
           const selId = sats.selected?.id;
-          sats.list = parseTle(data.text);
-          sats.tleAt = data.t;
+          sats.list = parseGp(data.rows);
+          sats.gpAt = data.t;
           sats.selected = sats.list.find((s) => s.id === selId) || null;
-          if (!sats.selected) closeCard();
+          if (!sats.selected && card.dataset.mode === 'sat') closeCard();
         }
       }
       refreshPositions();
     } finally {
       sats.busy = false;
     }
+  } else if (sats.list.length && !sats.busy && isLive()) {
+    updatePositions();
   }
   updateSatInfo();
 }
@@ -941,6 +986,7 @@ function updateSatInfo() {
   let s;
   if (sats.error) s = sats.error;
   else if (!sats.list.length) s = 'CARICO SATELLITI…';
+  else if (isLive()) s = `${sats.list.filter((x) => x.ok).length} SAT · IN DIRETTA`;
   else {
     const left = Math.max(0, POSITION_REFRESH_MS - (Date.now() - sats.refreshedAt)) / 1000;
     const mm = Math.floor(left / 60), ss = String(Math.floor(left % 60)).padStart(2, '0');
@@ -980,16 +1026,20 @@ function pickSatellite(cx, cy, radiusPx) {
 function selectSat(s) {
   sats.selected = s;
   updateSelection();
+  updateSelectedOrbit();
   if (s) openCard(s); else closeCard();
 }
 function updateSelection() {
   const s = sats.selected;
-  selRing.visible = selOrbitDots.visible = !!(s && s.ok);
+  selRing.visible = !!(s && s.ok);
   if (!selRing.visible) return;
   setPositions(selRing, new Float32Array([s.pos.x, s.pos.y, s.pos.z]));
-  const t = new Date(sats.refreshedAt);
-  setPositions(selOrbitDots, orbitBuffer([s], t, sat.gstime(t)));
   renderCardLive();
+}
+function updateSelectedOrbit() {
+  const s = sats.selected;
+  selOrbitDots.visible = !!(s && s.ok);
+  if (selOrbitDots.visible) setPositions(selOrbitDots, orbitBuffer([s], new Date(sats.refreshedAt), sats.orbitGmst));
 }
 
 /* ---------- Schedina ---------- */
@@ -1013,7 +1063,17 @@ const SITES = {
 };
 const fmt = (v, d = 0) => v.toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
 
+// Con le stesse righe aggiorna solo i testi cambiati: con l'aggiornamento ogni secondo
+// non si perde il testo selezionato nella schedina.
 function renderRows(dl, rows) {
+  const el = dl.children;
+  if (el.length === rows.length * 2) {
+    rows.forEach(([k, v], i) => {
+      if (el[2 * i].textContent !== k) el[2 * i].textContent = k;
+      if (el[2 * i + 1].textContent !== v) el[2 * i + 1].textContent = v;
+    });
+    return;
+  }
   dl.replaceChildren(...rows.flatMap(([k, v]) => {
     const dt = document.createElement('dt'), dd = document.createElement('dd');
     dt.textContent = k; dd.textContent = v;
@@ -1024,7 +1084,7 @@ function renderCardLive() {
   const s = sats.selected;
   if (!s || card.hidden || card.dataset.mode !== 'sat') return;
   const r = s.satrec, n = r.no / 60, a = Math.cbrt(MU / (n * n));
-  const ageH = (sats.refreshedAt - s.epoch) / 3600000;
+  const ageH = (sats.positionsAt - s.epoch) / 3600000;
   renderRows($('cardLive'), s.ok ? [
     ['Quota', fmt(s.alt) + ' km'],
     ['Velocità', fmt(s.speed, 2) + ' km/s'],
@@ -1033,7 +1093,7 @@ function renderCardLive() {
     ['Periodo', fmt(2 * Math.PI / r.no, 1) + ' min'],
     ['Apogeo / perigeo', `${fmt(a * (1 + r.ecco) - R_EQ)} / ${fmt(a * (1 - r.ecco) - R_EQ)} km`],
     ['Dati orbitali', ageH < 48 ? `di ${fmt(ageH)} h fa` : `di ${fmt(ageH / 24)} giorni fa`],
-    ['Posizione al', hhmm(sats.refreshedAt)],
+    ['Posizione al', isLive() ? 'adesso' : hhmm(sats.positionsAt)],
   ] : [['Stato', 'posizione non calcolabile']]);
 }
 // La schedina ha due modalità: 'sat' (un satellite) e 'overhead' (elenco "sopra di me").
@@ -1159,17 +1219,18 @@ function updateOverhead() {
     .filter((x) => x.el >= MIN_ELEVATION)
     .sort((a, b) => b.el - a.el);
   setPositions(overheadRings, new Float32Array(sats.overhead.flatMap(({ s }) => [s.pos.x, s.pos.y, s.pos.z])));
-  if (!card.hidden && card.dataset.mode === 'overhead') renderOverheadCard();
+  if (!card.hidden && card.dataset.mode === 'overhead') renderOverheadList();
 }
 
+const para = (text) => { const el = document.createElement('p'); el.textContent = text; return el; };
 function renderOverheadCard(message, offerApprox) {
   setCardMode('overhead');
   const o = sats.observer, list = $('cardList');
   $('cardTitle').textContent = 'SOPRA DI TE';
-  const p = (text) => { const el = document.createElement('p'); el.textContent = text; return el; };
+  delete list.dataset.ids;
   if (!o) {
     $('cardSub').textContent = '';
-    list.replaceChildren(p(message || 'Cerco la tua posizione…'));
+    list.replaceChildren(para(message || 'Cerco la tua posizione…'));
     if (offerApprox) {
       const b = document.createElement('button');
       b.className = 'pill';
@@ -1178,26 +1239,46 @@ function renderOverheadCard(message, offerApprox) {
         renderOverheadCard('Chiedo una posizione approssimativa alla rete…');
         try { setObserver(await approxLocation()); } catch { renderOverheadCard('Posizione approssimativa non disponibile.'); }
       });
-      list.append(p('Posso usare una posizione approssimativa ricavata dalla connessione (di solito la città).'), b);
+      list.append(para('Posso usare una posizione approssimativa ricavata dalla connessione (di solito la città).'), b);
     }
     return;
   }
+  renderOverheadList();
+}
+// Ricostruisce l'elenco solo se cambiano i satelliti o il loro ordine, altrimenti
+// aggiorna i testi: con l'aggiornamento ogni secondo un clic in corso non va perso.
+let overheadHead = null, overheadInfo = [];
+function renderOverheadList() {
+  const o = sats.observer, list = $('cardList');
+  if (!o) return;
   const where = `${fmt(Math.abs(o.lat), 2)}°${o.lat >= 0 ? 'N' : 'S'} ${fmt(Math.abs(o.lon), 2)}°${o.lon >= 0 ? 'E' : 'W'}`;
   const how = o.source === 'GPS' ? `GPS ±${fmt(o.accuracy)} m` : `dalla rete${o.city ? ' · ' + o.city : ''}`;
   $('cardSub').textContent = `${where} · ${how}`;
-  const head = sats.overhead.length
-    ? `${sats.overhead.length} satelliti del gruppo «${GROUPS[sats.group]}» sono più alti di ${MIN_ELEVATION}° sull'orizzonte (posizioni delle ${hhmm(sats.refreshedAt)}). Tocca un nome per la scheda.`
+  const ids = sats.overhead.map(({ s }) => s.id).join();
+  if (list.dataset.ids !== ids) {
+    list.dataset.ids = ids;
+    overheadHead = para('');
+    overheadInfo = [];
+    list.replaceChildren(overheadHead, ...sats.overhead.map(({ s }) => {
+      const b = document.createElement('button');
+      b.className = 'sat-row';
+      const name = document.createElement('span'), info = document.createElement('span');
+      name.textContent = s.name;
+      overheadInfo.push(info);
+      b.append(name, info);
+      // Per numero NORAD: dopo un nuovo download degli elementi gli oggetti cambiano.
+      b.addEventListener('click', () => selectSat(sats.list.find((x) => x.id === s.id) || null));
+      return b;
+    }));
+  }
+  const when = isLive() ? 'adesso' : `posizioni delle ${hhmm(sats.positionsAt)}`;
+  overheadHead.textContent = sats.overhead.length
+    ? `${sats.overhead.length} satelliti del gruppo «${GROUPS[sats.group]}» sono più alti di ${MIN_ELEVATION}° sull'orizzonte (${when}). Tocca un nome per la scheda.`
     : `Nessun satellite del gruppo «${GROUPS[sats.group]}» è più alto di ${MIN_ELEVATION}° sull'orizzonte adesso. Prova un altro gruppo, per esempio Starlink.`;
-  list.replaceChildren(p(head), ...sats.overhead.map(({ s, el, az, range }) => {
-    const b = document.createElement('button');
-    b.className = 'sat-row';
-    const name = document.createElement('span'), info = document.createElement('span');
-    name.textContent = s.name;
-    info.textContent = `${fmt(el)}° ${COMPASS[Math.round(az / 45) % 8]} · ${fmt(range)} km`;
-    b.append(name, info);
-    b.addEventListener('click', () => selectSat(s));
-    return b;
-  }));
+  sats.overhead.forEach(({ el, az, range }, i) => {
+    const t = `${fmt(el)}° ${COMPASS[Math.round(az / 45) % 8]} · ${fmt(range)} km`;
+    if (overheadInfo[i].textContent !== t) overheadInfo[i].textContent = t;
+  });
 }
 
 function setObserver(o) {
@@ -1213,6 +1294,7 @@ function setObserver(o) {
 $('btnOverhead').addEventListener('click', async () => {
   sats.selected = null;
   updateSelection();
+  updateSelectedOrbit();
   if (sats.observer) { setObserver(sats.observer); return; }
   renderOverheadCard();
   try {
