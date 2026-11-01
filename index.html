@@ -31,6 +31,7 @@
     overscroll-behavior: none;
   }
   #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #objects { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 
   /* HUD */
   .hud {
@@ -85,9 +86,15 @@
   .records { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   .rec-btn { pointer-events: auto; font-size: 7px; padding: 7px 9px; color: var(--amber); border-color: #4a3a12; }
   .card-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
-  .card-section { font: 9px/1.6 'Press Start 2P', monospace; color: #ff5fd2; margin-top: 8px; padding-top: 12px; border-top: 1px solid #22222a; }
-  .all-row span:last-child { color: #ff5fd2; }
-  .all-row:hover { border-color: #ff5fd2; }
+  .card-section { font: 9px/1.6 'Press Start 2P', monospace; color: var(--amber); margin-top: 8px; padding-top: 12px; border-top: 1px solid #22222a; }
+  /* Righe degli oggetti di N2YO: il colore dice il tipo, come le icone sul globo */
+  .all-row { --k: #ffc23a; }
+  .all-row.k-station { --k: #f2f4f8; }
+  .all-row.k-rb { --k: #ff8a1f; }
+  .all-row.k-deb { --k: #a7aeb8; }
+  .all-row span:first-child::before { content: '■ '; color: var(--k); }
+  .all-row span:last-child { color: var(--k); }
+  .all-row:hover { border-color: var(--k); }
   .card-list p { margin: 0 0 4px; font: 13px/1.45 system-ui, sans-serif; color: #c9c7c0; }
   .card-list .pill { align-self: flex-start; }
   .sat-row {
@@ -152,6 +159,40 @@
   .power { width: 100%; height: 6px; border-radius: 3px; background: #1b1b22; overflow: hidden; }
   #powerBar { height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--amber) 60%, var(--red)); }
 
+  /* MASTER ARM: interruttore a levetta sotto uno sportellino rosso a strisce, come quelli per
+     armare i missili. Chiuso = SAFE (solo satelliti e stazioni), aperto e levetta su = ARM. */
+  .arm {
+    display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 2px; padding: 0;
+    border: 0; background: none; cursor: pointer; color: var(--dim); text-align: left;
+    font: 6px/1.7 'Press Start 2P', monospace;
+  }
+  .arm:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+  .arm-base {
+    position: relative; flex: none; width: 26px; height: 34px; border-radius: 4px; perspective: 90px;
+    background: repeating-linear-gradient(-45deg, #e8b400 0 4px, #141414 4px 8px);
+    box-shadow: inset 0 0 0 3px #0c0c0f, 0 1px 0 rgba(255,255,255,.06);
+  }
+  .arm-base::before {   /* dado del perno */
+    content: ''; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+    border-radius: 50%; background: radial-gradient(circle at 35% 35%, #d8d8dc, #4a4a50);
+  }
+  .arm-lever {
+    position: absolute; left: 50%; top: 50%; width: 5px; height: 13px; margin-left: -2.5px;
+    border-radius: 3px; background: linear-gradient(90deg, #6a6a70, #f4f4f6 45%, #7a7a80);
+    transform-origin: 50% 0; transform: rotate(0deg); transition: transform .15s .12s;
+  }
+  .arm-cover {
+    position: absolute; inset: -2px; border-radius: 5px; transform-origin: 50% 0;
+    background: linear-gradient(rgba(255,255,255,.18), transparent 40%),
+      repeating-linear-gradient(0deg, #c41212 0 3px, #a00b0b 3px 6px);
+    border: 1px solid #ff6a6a; box-shadow: 0 2px 4px rgba(0,0,0,.6);
+    transition: transform .25s;
+  }
+  .arm-state { font-weight: normal; color: var(--green); }
+  .arm[aria-checked="true"] .arm-cover { transform: rotateX(78deg); }
+  .arm[aria-checked="true"] .arm-lever { transform: rotate(180deg); }
+  .arm[aria-checked="true"] .arm-state { color: var(--red); text-shadow: 0 0 6px var(--red); }
+
   .buttons { display: flex; flex-direction: column; gap: 12px; }
   .btn { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 6px; color: var(--dim); }
   .arcade {
@@ -201,6 +242,7 @@
 </head>
 <body>
 <canvas id="scene"></canvas>
+<canvas id="objects"></canvas>
 
 <header class="hud">
   <div class="title">GLOBE<span>·</span>STICK</div>
@@ -249,6 +291,10 @@
     </div>
     <div class="vals"><div id="valX">X +0.00</div><div id="valY">Y +0.00</div></div>
     <div class="power"><div id="powerBar"></div></div>
+    <button class="arm" id="btnArm" role="switch" aria-checked="false">
+      <span class="arm-base"><span class="arm-lever"></span><span class="arm-cover"></span></span>
+      <span class="arm-text">MASTER<br>ARM<br><b class="arm-state" id="armState">SAFE</b></span>
+    </button>
   </div>
   <canvas id="stick" role="application" data-i18n-aria="stickAria" aria-label="Joystick: trascina o usa le frecce"></canvas>
   <div class="buttons">
@@ -297,7 +343,9 @@ const STR = {
     ovSome: (n, g, min, when) => `${n} satelliti del gruppo «${g}» sono più alti di ${min}° sull'orizzonte (${when}). Tocca un nome per la scheda.`,
     ovNone: (g, min) => `Nessun satellite del gruppo «${g}» è più alto di ${min}° sull'orizzonte adesso. Prova un altro gruppo, per esempio Starlink.`,
     allTitle: 'TUTTI GLI OGGETTI · N2YO', allLoading: 'Chiedo a N2YO tutto quello che hai sopra la testa…',
-    allSome: (n, min, at) => `${n} oggetti di ogni tipo (satelliti, stadi di razzo, detriti) sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}): sul globo sono i punti viola. Tocca un nome per andarci.`,
+    allSome: (n, min, at) => `${n} oggetti sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}). Sul globo, da lontano, sono raggruppati: tocca un gruppo per avvicinarti, o un nome qui sotto per andarci.`,
+    allHidden: (n) => `Altri ${n} sono stadi di razzo e detriti: per vederli, arma l'interruttore MASTER ARM.`,
+    armTitle: 'MASTER ARM: in SAFE solo satelliti e stazioni spaziali, in ARM anche stadi di razzo e detriti',
     allMore: (n) => `…e altri ${n}.`, allNone: 'N2YO non vede niente sopra di te adesso.',
     allBusy: 'Troppe richieste a N2YO in questo momento: riprova fra qualche minuto.',
     allUnavailable: 'Elenco completo non disponibile in questo momento.', allCredit: 'Dati di N2YO.com ↗',
@@ -331,7 +379,9 @@ const STR = {
     ovSome: (n, g, min, when) => `${n} satellites in «${g}» are more than ${min}° above the horizon (${when}). Tap a name for details.`,
     ovNone: (g, min) => `No satellite in «${g}» is more than ${min}° above the horizon right now. Try another group, for example Starlink.`,
     allTitle: 'EVERYTHING · N2YO', allLoading: 'Asking N2YO for everything above your head…',
-    allSome: (n, min, at) => `${n} objects of every kind (satellites, rocket bodies, debris) are more than ${min}° above the horizon (positions at ${at}): they are the purple dots on the globe. Tap a name to go there.`,
+    allSome: (n, min, at) => `${n} objects are more than ${min}° above the horizon (positions at ${at}). From afar they are grouped on the globe: tap a group to zoom in, or a name below to go there.`,
+    allHidden: (n) => `${n} more are rocket bodies and debris: flip the MASTER ARM switch to see them.`,
+    armTitle: 'MASTER ARM: SAFE shows only satellites and space stations, ARM adds rocket bodies and debris',
     allMore: (n) => `…and ${n} more.`, allNone: 'N2YO sees nothing above you right now.',
     allBusy: 'Too many requests to N2YO right now: try again in a few minutes.',
     allUnavailable: 'Full list unavailable right now.', allCredit: 'Data from N2YO.com ↗',
@@ -553,7 +603,8 @@ $('scene').addEventListener('pointermove', (e) => {
 });
 $('scene').addEventListener('pointerup', (e) => {
   if (tap && tap.id === e.pointerId && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 8) {
-    selectSat(pickSatellite(e.clientX, e.clientY, e.pointerType === 'touch' ? 28 : 16));
+    const slop = e.pointerType === 'touch' ? 12 : 2;
+    if (!tapObjects(e.clientX, e.clientY, slop)) selectSat(pickSatellite(e.clientX, e.clientY, 16 + slop));
   }
   tap = null;
 });
@@ -880,12 +931,25 @@ function dotTexture(ring) {
   if (ring) { x.lineWidth = 6; x.strokeStyle = '#fff'; x.stroke(); } else { x.fillStyle = '#fff'; x.fill(); }
   return new THREE.CanvasTexture(c);
 }
-// Iconcina del satellite: corpo dorato e due pannelli solari, leggermente inclinata.
-function satIconTexture() {
+// Iconcine degli oggetti, disegnate in un quadrato di 64 con l'origine al centro: diventano
+// texture per i gruppi (iconTexture) e immagini piccole per gli oggetti di N2YO (iconCanvas).
+function iconCanvas(draw, size = 64) {
   const c = document.createElement('canvas');
-  c.width = c.height = 64;
+  c.width = c.height = size;
   const x = c.getContext('2d');
-  x.translate(32, 32); x.rotate(-0.55);
+  x.scale(size / 64, size / 64);
+  x.translate(32, 32);
+  draw(x);
+  return c;
+}
+function iconTexture(draw) {
+  const t = new THREE.CanvasTexture(iconCanvas(draw));
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+// Satellite: corpo dorato e due pannelli solari, leggermente inclinato.
+function drawSatIcon(x) {
+  x.rotate(-0.55);
   x.lineWidth = 2;
   for (const side of [-1, 1]) {
     const px = side < 0 ? -30 : 10;
@@ -900,16 +964,10 @@ function satIconTexture() {
   x.fillRect(-9, -12, 18, 24); x.strokeRect(-9, -12, 18, 24);
   x.beginPath(); x.moveTo(0, -12); x.lineTo(0, -19); x.stroke();
   x.beginPath(); x.arc(0, -21, 3, 0, Math.PI * 2); x.fillStyle = '#fff3c4'; x.fill();
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }
-// Iconcina delle stazioni spaziali: traliccio con quattro coppie di pannelli e moduli al centro.
-function stationIconTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const x = c.getContext('2d');
-  x.translate(32, 32); x.rotate(-0.35);
+// Stazione spaziale: traliccio con quattro coppie di pannelli e moduli al centro.
+function drawStationIcon(x) {
+  x.rotate(-0.35);
   x.strokeStyle = '#d8dde6'; x.lineWidth = 3;
   x.beginPath(); x.moveTo(-29, 0); x.lineTo(29, 0); x.stroke();
   x.lineWidth = 1.5;
@@ -923,11 +981,39 @@ function stationIconTexture() {
   x.fillStyle = '#f2f4f8'; x.strokeStyle = '#8f99aa'; x.lineWidth = 2;
   x.fillRect(-10, -4, 20, 8); x.strokeRect(-10, -4, 20, 8);
   x.fillRect(-4, -13, 8, 26); x.strokeRect(-4, -13, 8, 26);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+}
+// Stadio di razzo: cilindro chiaro con le fasce arancioni e l'ugello scuro.
+function drawRocketIcon(x) {
+  x.rotate(-0.6);
+  x.lineWidth = 2.5;
+  x.fillStyle = '#4a4d55'; x.strokeStyle = '#1c1d21';
+  x.beginPath(); x.moveTo(-7, 15); x.lineTo(7, 15); x.lineTo(11, 26); x.lineTo(-11, 26); x.closePath(); x.fill(); x.stroke();
+  x.fillStyle = '#e4e6ea'; x.strokeStyle = '#ff8a1f';
+  x.beginPath(); x.roundRect(-9, -26, 18, 42, 4); x.fill(); x.stroke();
+  x.fillStyle = '#ff8a1f';
+  x.fillRect(-9, -15, 18, 5); x.fillRect(-9, 4, 18, 5);
+}
+// Detrito: scheggia irregolare grigia con due frammenti.
+function drawDebrisIcon(x) {
+  x.fillStyle = '#a7aeb8'; x.strokeStyle = '#4b5059'; x.lineWidth = 3;
+  x.beginPath();
+  x.moveTo(-16, -6); x.lineTo(-4, -18); x.lineTo(10, -12); x.lineTo(16, 2); x.lineTo(4, 16); x.lineTo(-12, 10);
+  x.closePath(); x.fill(); x.stroke();
+  x.fillStyle = '#d7dce3';
+  x.beginPath(); x.moveTo(-6, -8); x.lineTo(4, -10); x.lineTo(0, 0); x.closePath(); x.fill();
+  x.fillStyle = '#a7aeb8';
+  x.beginPath(); x.arc(22, -20, 4, 0, Math.PI * 2); x.fill(); x.stroke();
+  x.beginPath(); x.arc(-22, 20, 3, 0, Math.PI * 2); x.fill(); x.stroke();
 }
 const STATION_RE = /^(ISS|CSS)\b|TIANGONG|TIANHE/i;
+// Tipo dal nome, come lo scrivono CelesTrak e N2YO: "… R/B" stadio di razzo, "… DEB" detrito.
+const objectKind = (name) => (/\bDEB\b/i.test(name) ? 'deb' : /\bR\/B\b/i.test(name) ? 'rb'
+  : STATION_RE.test(name) ? 'station' : 'sat');
+// MASTER ARM: in sicurezza si vedono solo satelliti e stazioni; armato anche stadi e detriti.
+const arm = { on: false };
+try { arm.on = localStorage.getItem('arm') === '1'; } catch { /* storage non disponibile */ }
+const visibleKind = (kind) => arm.on || kind === 'sat' || kind === 'station';
+const shown = (s) => s.ok && visibleKind(s.kind);
 // Le orbite si calcolano a ogni aggiornamento completo, con il GMST di quel momento;
 // fra un aggiornamento e l'altro questo gruppo le ruota con la Terra, così restano
 // sotto i satelliti anche quando le posizioni si aggiornano ogni secondo.
@@ -943,8 +1029,11 @@ function pointsLayer(opts, parent = satellitesLayer) {
 }
 const orbitDots = pointsLayer({ size: 2, color: 0x6fb8ff, opacity: 0.35 }, orbitsLayer);
 const selOrbitDots = pointsLayer({ size: 3.5, color: 0x39ff7a, opacity: 0.95 }, orbitsLayer);
-const satDots = pointsLayer({ size: 24, map: satIconTexture(), alphaTest: 0.1 });
-const stationDots = pointsLayer({ size: 38, map: stationIconTexture(), alphaTest: 0.1 });
+const satDots = pointsLayer({ size: 24, map: iconTexture(drawSatIcon), alphaTest: 0.1 });
+const stationDots = pointsLayer({ size: 38, map: iconTexture(drawStationIcon), alphaTest: 0.1 });
+const rocketDots = pointsLayer({ size: 20, map: iconTexture(drawRocketIcon), alphaTest: 0.1 });
+const debrisDots = pointsLayer({ size: 14, map: iconTexture(drawDebrisIcon), alphaTest: 0.1 });
+const KIND_DOTS = { sat: satDots, station: stationDots, rb: rocketDots, deb: debrisDots };
 const overheadRings = pointsLayer({ size: 36, color: 0x4fe3ff, map: dotTexture(true), opacity: 0.85 });
 const selRing = pointsLayer({ size: 42, color: 0x39ff7a, map: dotTexture(true) });
 // Stessa lunghezza: riscrive il buffer esistente. Altrimenti geometria nuova, liberando
@@ -977,7 +1066,6 @@ const GP_FIELDS = [
   'OBJECT_NAME', 'OBJECT_ID', 'NORAD_CAT_ID', 'EPOCH', 'MEAN_MOTION', 'ECCENTRICITY', 'INCLINATION',
   'RA_OF_ASC_NODE', 'ARG_OF_PERICENTER', 'MEAN_ANOMALY', 'BSTAR', 'MEAN_MOTION_DOT', 'MEAN_MOTION_DDOT',
 ];
-const STATION_EXCLUDE_RE = /\b(DEB|R\/B)\b/i;   // detriti e stadi di razzo "ISS DEB", "CSS R/B"…
 
 function parseGp(rows) {
   const out = [];
@@ -988,7 +1076,7 @@ function parseGp(rows) {
       out.push({
         name, id: omm.NORAD_CAT_ID, cospar: omm.OBJECT_ID || '',
         epoch: new Date(omm.EPOCH.endsWith('Z') ? omm.EPOCH : omm.EPOCH + 'Z'),
-        isStation: STATION_RE.test(name) && !STATION_EXCLUDE_RE.test(name),
+        kind: objectKind(name),
         satrec: sat.json2satrec(omm),
         pos: new THREE.Vector3(), ok: false, lat: 0, lon: 0, alt: 0, speed: 0,
       });
@@ -1017,7 +1105,7 @@ async function fetchJsonArray(urls) {
 
 // Prima l'API del sito, che tiene una copia dei dati di CelesTrak (api/server.py): così CelesTrak
 // non vede un download per ogni visitatore e non risponde 403 a chi condivide l'IP con altri.
-// Dove l'API non c'è (file aperto dal PC, avvia-server.ps1) si chiede direttamente a CelesTrak.
+// Dove l'API non c'è (file aperto dal PC) si chiede direttamente a CelesTrak.
 async function fetchGp(group) {
   const key = 'gp:' + group;
   let cached = null;
@@ -1061,7 +1149,7 @@ const isLive = () => sats.list.length <= LIVE_MAX;
 // Posizioni attuali: icone, anello della selezione, "sopra di me".
 function updatePositions(now = new Date()) {
   const gmst = sat.gstime(now);
-  const arr = [], stationArr = [];
+  const byKind = { sat: [], station: [], rb: [], deb: [] };
   sats.list.forEach((s) => {
     const pv = propagate(s.satrec, now);
     s.ok = !!pv;
@@ -1074,10 +1162,9 @@ function updatePositions(now = new Date()) {
     } else {
       s.pos.set(0, 0, 0);   // decaduto o non propagabile: resta nascosto dentro la Terra
     }
-    (s.isStation ? stationArr : arr).push(s.pos.x, s.pos.y, s.pos.z);
+    if (shown(s)) byKind[s.kind].push(s.pos.x, s.pos.y, s.pos.z);
   });
-  setPositions(satDots, new Float32Array(arr));
-  setPositions(stationDots, new Float32Array(stationArr));
+  for (const [kind, dots] of Object.entries(KIND_DOTS)) setPositions(dots, new Float32Array(byKind[kind]));
   orbitsLayer.rotation.y = sats.orbitGmst - gmst;   // la Terra è girata dal calcolo delle orbite
   sats.positionsAt = now.getTime();
   updateSelection();
@@ -1091,7 +1178,7 @@ function refreshPositions() {
   sats.orbitGmst = sat.gstime(now);
   updatePositions(now);
   satDots.material.size = sats.list.length > 1000 ? 12 : 24;   // con migliaia di satelliti (Starlink) icone più piccole
-  const live = sats.list.filter((s) => s.ok);
+  const live = sats.list.filter(shown);
   setPositions(orbitDots, live.length <= ALL_ORBITS_MAX ? orbitBuffer(live, now, sats.orbitGmst) : new Float32Array(0));
   updateSelectedOrbit();
 }
@@ -1101,8 +1188,7 @@ async function loadGroup(group) {
   sats.list = [];
   sats.error = '';
   selectSat(null);
-  setPositions(satDots, new Float32Array(0));
-  setPositions(stationDots, new Float32Array(0));
+  for (const dots of Object.values(KIND_DOTS)) setPositions(dots, new Float32Array(0));
   setPositions(orbitDots, new Float32Array(0));
   setPositions(overheadRings, new Float32Array(0));
   try { localStorage.setItem('group', group); } catch { /* ok */ }
@@ -1161,11 +1247,11 @@ function updateSatInfo() {
   let s;
   if (sats.error) s = t(sats.error);
   else if (!sats.list.length) s = t('satLoading');
-  else if (isLive()) s = t('satLive', sats.list.filter((x) => x.ok).length);
+  else if (isLive()) s = t('satLive', sats.list.filter(shown).length);
   else {
     const left = Math.max(0, POSITION_REFRESH_MS - (Date.now() - sats.refreshedAt)) / 1000;
     const mm = Math.floor(left / 60), ss = String(Math.floor(left % 60)).padStart(2, '0');
-    s = t('satUpdated', sats.list.filter((x) => x.ok).length, hhmm(sats.refreshedAt), `${mm}:${ss}`);
+    s = t('satUpdated', sats.list.filter(shown).length, hhmm(sats.refreshedAt), `${mm}:${ss}`);
   }
   $('satinfo').textContent = s;
 }
@@ -1187,7 +1273,7 @@ function pickSatellite(cx, cy, radiusPx) {
   const m = satellitesLayer.matrixWorld, p = new THREE.Vector3();
   let best = null, bestD = radiusPx;
   for (const s of sats.list) {
-    if (!s.ok) continue;
+    if (!shown(s)) continue;
     p.copy(s.pos).applyMatrix4(m);
     if (hiddenBehindEarth(p)) continue;
     p.project(camera);
@@ -1416,7 +1502,7 @@ function updateOverhead() {
   if (!o) return;
   const gd = { latitude: o.lat * DEG, longitude: o.lon * DEG, height: 0.1 };
   sats.overhead = sats.list
-    .filter((s) => s.ok)
+    .filter(shown)
     .map((s) => {
       const la = sat.ecfToLookAngles(gd, s.ecf);
       return { s, el: la.elevation / DEG, az: la.azimuth / DEG, range: la.rangeSat };
@@ -1504,11 +1590,126 @@ function setObserver(o) {
 }
 
 /* ---------- Sopra di me, tutti gli oggetti di ogni gruppo: N2YO tramite l'API del sito ----------
-   N2YO dà solo la posizione al momento della richiesta (niente elementi orbitali): punti fermi
-   sul globo, in viola, e un elenco. Si aggiorna premendo di nuovo SOPRA DI ME. */
+   N2YO dà solo la posizione al momento della richiesta (niente elementi orbitali): icone ferme
+   sul globo e un elenco. Si aggiorna premendo di nuovo SOPRA DI ME. */
 const ALL_MAX_ROWS = 40;
 const allAbove = { list: [], at: 0, state: 'idle' };   // state: idle, loading, ok o la chiave di un errore
-const allDots = pointsLayer({ size: 5, color: 0xff5fd2, opacity: 0.9 });
+const allShown = () => allAbove.list.filter((x) => visibleKind(x.kind));
+
+/* Sul globo si disegnano su un canvas 2D sopra la scena: a ogni fotogramma le posizioni si
+   proiettano sullo schermo e si raggruppano per distanza: un oggetto entra nel primo cluster
+   entro CLUSTER_RADIUS px, altrimenti ne apre uno nuovo. Con lo zoom gli oggetti si allontanano
+   sullo schermo e i cluster si aprono negli oggetti singoli. L'elenco è sempre nello stesso
+   ordine, quindi i cluster restano stabili mentre il globo gira. */
+const KIND_ICON = { sat: [16, drawSatIcon, '#ffc23a'], station: [22, drawStationIcon, '#f2f4f8'],
+  rb: [15, drawRocketIcon, '#ff8a1f'], deb: [12, drawDebrisIcon, '#a7aeb8'] };   // lato in px, disegno, colore
+const CLUSTER_RADIUS = 58;   // px
+const objCanvas = $('objects'), og = objCanvas.getContext('2d');
+const objSprites = {};
+let objHits = [], objDrawn = false, objLabel = null;   // objLabel: { it, until } nome dopo un tocco
+function objSprite(kind, dpr) {
+  const key = kind + dpr;
+  if (!objSprites[key]) objSprites[key] = iconCanvas(KIND_ICON[kind][1], Math.ceil(KIND_ICON[kind][0] * dpr));
+  return objSprites[key];
+}
+function drawObjects() {
+  const items = sats.observer && allAbove.state === 'ok' ? allShown() : [];
+  if (!items.length && !objDrawn) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = window.innerWidth, h = window.innerHeight;
+  if (objCanvas.width !== Math.round(w * dpr) || objCanvas.height !== Math.round(h * dpr)) {
+    objCanvas.width = Math.round(w * dpr); objCanvas.height = Math.round(h * dpr);
+  }
+  og.setTransform(dpr, 0, 0, dpr, 0, 0);
+  og.clearRect(0, 0, w, h);
+  objHits = [];
+  objDrawn = items.length > 0;
+  if (!objDrawn) return;
+
+  // Più si è vicini, più il raggio si stringe: allo zoom massimo restano quasi solo oggetti singoli.
+  const R = CLUSTER_RADIUS * Math.min(1, 1.5 / view.zoom) ** 1.4;
+  const m = satellitesLayer.matrixWorld, p = new THREE.Vector3();
+  const clusters = [], grid = new Map();   // grid: celle di lato R per cercare solo i cluster vicini
+  // Niente oggetti sotto l'intestazione e il pannello comandi: coprirebbero testi e pulsanti.
+  const covered = [document.querySelector('.hud'), deck].map((el) => el.getBoundingClientRect());
+  const underUi = (x, y) => covered.some((r) => x > r.left - 8 && x < r.right + 8 && y > r.top - 8 && y < r.bottom + 8);
+  for (const it of items) {
+    p.copy(it.pos).applyMatrix4(m);
+    if (hiddenBehindEarth(p)) continue;
+    p.project(camera);
+    if (p.z > 1 || Math.abs(p.x) > 1.05 || Math.abs(p.y) > 1.05) continue;
+    const x = (p.x + 1) / 2 * w, y = (1 - p.y) / 2 * h, gx = Math.floor(x / R), gy = Math.floor(y / R);
+    if (underUi(x, y)) continue;
+    let best = null, bestD = R;
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        for (const c of grid.get((gx + i) + ',' + (gy + j)) || []) {
+          const d = Math.hypot(c.cx - x, c.cy - y);
+          if (d < bestD) { best = c; bestD = d; }
+        }
+      }
+    }
+    if (best) { best.x += x; best.y += y; best.items.push(it); continue; }
+    const c = { cx: x, cy: y, x, y, items: [it] }, key = gx + ',' + gy;
+    clusters.push(c);
+    if (!grid.has(key)) grid.set(key, []);
+    grid.get(key).push(c);
+  }
+  og.textAlign = 'center'; og.textBaseline = 'middle';
+  for (const c of clusters) {
+    const n = c.items.length, x = c.x / n, y = c.y / n;
+    if (n === 1) {
+      const [size] = KIND_ICON[c.items[0].kind];
+      og.drawImage(objSprite(c.items[0].kind, dpr), x - size / 2, y - size / 2, size, size);
+      objHits.push({ x, y, r: size / 2 + 6, items: c.items });
+      continue;
+    }
+    // Cluster: anello del colore del tipo più numeroso e il numero degli oggetti
+    const count = {};
+    for (const it of c.items) count[it.kind] = (count[it.kind] || 0) + 1;
+    const main = Object.keys(count).sort((a, b) => count[b] - count[a])[0];
+    const r = 10 + Math.min(9, Math.log2(n) * 2);
+    og.beginPath(); og.arc(x, y, r, 0, Math.PI * 2);
+    og.fillStyle = 'rgba(10,11,16,.82)'; og.fill();
+    og.lineWidth = 2; og.strokeStyle = KIND_ICON[main][2]; og.stroke();
+    og.fillStyle = '#e8e6df'; og.font = `${n > 99 ? 7 : 8}px 'Press Start 2P', monospace`;
+    og.fillText(String(n), x, y + 1);
+    objHits.push({ x, y, r: r + 4, items: c.items });
+  }
+  // Nome dell'oggetto toccato, per qualche secondo
+  if (objLabel && performance.now() < objLabel.until) {
+    const hit = objHits.find((o) => o.items.length === 1 && o.items[0] === objLabel.it);
+    if (hit) {
+      const txt = `${objLabel.it.name} · ${fmt(objLabel.it.alt)} km`;
+      og.font = '11px ui-monospace, Consolas, monospace';
+      const tw = og.measureText(txt).width;
+      og.fillStyle = 'rgba(10,11,16,.9)'; og.fillRect(hit.x - tw / 2 - 6, hit.y - hit.r - 22, tw + 12, 18);
+      og.fillStyle = KIND_ICON[objLabel.it.kind][2]; og.fillText(txt, hit.x, hit.y - hit.r - 13);
+    }
+  } else objLabel = null;
+}
+// Tocco sugli oggetti di N2YO: un cluster avvicina la vista, un oggetto singolo mostra il nome
+// (o apre la schedina, se è anche nel gruppo scelto). Vero se il tocco è stato usato qui.
+function tapObjects(cx, cy, slop) {
+  let best = null, bestD = Infinity;
+  for (const o of objHits) {
+    const d = Math.hypot(o.x - cx, o.y - cy);
+    if (d < o.r + slop && d < bestD) { best = o; bestD = d; }
+  }
+  if (!best) return false;
+  if (best.items.length > 1) {
+    const v = new THREE.Vector3();
+    for (const it of best.items) v.add(it.pos);
+    v.normalize();   // centro del cluster, sulla Terra
+    view.homing = geoToView(Math.asin(v.y) / DEG, Math.atan2(-v.z, v.x) / DEG);
+    view.zoomTarget = Math.min(2.6, view.zoom * 2);
+    return true;
+  }
+  const it = best.items[0], s = sats.list.find((y) => y.id === it.id);
+  if (s && shown(s)) flyTo(s);
+  else objLabel = { it, until: performance.now() + 4000 };
+  return true;
+}
+
 async function loadAllAbove() {
   const o = sats.observer;
   if (!o) return;
@@ -1523,7 +1724,7 @@ async function loadAllAbove() {
       const ecf = sat.geodeticToEcf({ latitude: a.satlat * DEG, longitude: a.satlng * DEG, height: a.satalt });
       const la = sat.ecfToLookAngles(gd, ecf);
       return {
-        id: a.satid, name: a.satname, lat: a.satlat, lon: a.satlng, alt: a.satalt,
+        id: a.satid, name: a.satname, kind: objectKind(a.satname), lat: a.satlat, lon: a.satlng, alt: a.satalt,
         el: la.elevation / DEG, az: la.azimuth / DEG, pos: ecfToScene(ecf, new THREE.Vector3()),
       };
     }).filter((x) => x.el >= MIN_ELEVATION).sort((a, b) => b.el - a.el);
@@ -1533,7 +1734,6 @@ async function loadAllAbove() {
     allAbove.list = [];
     allAbove.state = STR[lang][err.message] ? err.message : 'allUnavailable';
   }
-  setPositions(allDots, new Float32Array(allAbove.list.flatMap(({ pos }) => [pos.x, pos.y, pos.z])));
   renderAllAbove();
 }
 function renderAllAbove() {
@@ -1544,10 +1744,10 @@ function renderAllAbove() {
   title.className = 'card-section';
   title.textContent = t('allTitle');
   if (allAbove.state !== 'ok') { box.replaceChildren(title, para(t(allAbove.state === 'loading' ? 'allLoading' : allAbove.state))); return; }
-  const compass = t('compass');
-  const rows = allAbove.list.slice(0, ALL_MAX_ROWS).map((x) => {
+  const compass = t('compass'), list = allShown(), hidden = allAbove.list.length - list.length;
+  const rows = list.slice(0, ALL_MAX_ROWS).map((x) => {
     const b = document.createElement('button');
-    b.className = 'sat-row all-row';
+    b.className = 'sat-row all-row k-' + x.kind;
     const name = document.createElement('span'), info = document.createElement('span');
     name.textContent = x.name;
     info.textContent = `${fmt(x.el)}° ${compass[Math.round(x.az / 45) % 8]} · ${fmt(x.alt)} km`;
@@ -1555,7 +1755,8 @@ function renderAllAbove() {
     // Se è anche nel gruppo scelto apre la sua schedina, altrimenti porta il globo sopra di lui.
     b.addEventListener('click', () => {
       const s = sats.list.find((y) => y.id === x.id);
-      if (s && s.ok) flyTo(s); else view.homing = geoToView(x.lat, x.lon);
+      if (s && shown(s)) flyTo(s);
+      else { view.homing = geoToView(x.lat, x.lon); objLabel = { it: x, until: performance.now() + 4000 }; }
     });
     return b;
   });
@@ -1566,9 +1767,10 @@ function renderAllAbove() {
   credit.textContent = t('allCredit');
   box.replaceChildren(
     title,
-    para(allAbove.list.length ? t('allSome', allAbove.list.length, MIN_ELEVATION, hhmm(allAbove.at)) : t('allNone')),
+    para(list.length ? t('allSome', list.length, MIN_ELEVATION, hhmm(allAbove.at)) : t('allNone')),
+    ...(hidden ? [para(t('allHidden', hidden))] : []),
     ...rows,
-    ...(allAbove.list.length > ALL_MAX_ROWS ? [para(t('allMore', allAbove.list.length - ALL_MAX_ROWS))] : []),
+    ...(list.length > ALL_MAX_ROWS ? [para(t('allMore', list.length - ALL_MAX_ROWS))] : []),
     credit,
   );
 }
@@ -1617,7 +1819,7 @@ const RECORDS = {
 function goToRecord(kind) {
   const score = RECORDS[kind];
   let best = null;
-  for (const s of sats.list) if (s.ok && (!best || score(s) > score(best))) best = s;
+  for (const s of sats.list) if (shown(s) && (!best || score(s) > score(best))) best = s;
   if (best) flyTo(best);
 }
 for (const b of document.querySelectorAll('[data-record]')) {
@@ -1656,12 +1858,30 @@ function applyLang() {
   flag.innerHTML = FLAGS[lang === 'it' ? 'en' : 'it'];   // la bandiera della lingua in cui si passa
   flag.title = t('langSwitch');
   flag.setAttribute('aria-label', t('langSwitch'));
+  $('btnArm').title = t('armTitle');
+  $('btnArm').setAttribute('aria-label', t('armTitle'));
   $('modeLabel').textContent = t(view.mode === 'fly' ? 'modeFly' : 'modeDrag');
   setStatus(statusKey);
   updateSatInfo();
   if (!card.hidden && card.dataset.mode === 'sat' && sats.selected) openCard(sats.selected);
   else if (!card.hidden && card.dataset.mode === 'overhead') renderOverheadCard(...overheadArgs);
 }
+/* ---------- MASTER ARM ---------- */
+function applyArm() {
+  $('btnArm').setAttribute('aria-checked', String(arm.on));
+  $('armState').textContent = arm.on ? 'ARM' : 'SAFE';
+}
+$('btnArm').addEventListener('click', () => {
+  arm.on = !arm.on;
+  try { localStorage.setItem('arm', arm.on ? '1' : '0'); } catch { /* ok */ }
+  applyArm();
+  if (sats.selected && !shown(sats.selected)) selectSat(null);
+  if (sats.list.length) refreshPositions();   // icone, orbite ed elenco "sopra di me" del gruppo
+  renderAllAbove();
+  updateSatInfo();
+});
+applyArm();
+
 $('btnLang').addEventListener('click', () => {
   lang = lang === 'it' ? 'en' : 'it';
   try { localStorage.setItem('lang', lang); } catch { /* ok */ }
@@ -1718,6 +1938,7 @@ function frame(now) {
   earthPivot.rotation.set(view.tilt, view.spin, 0);
   updateCoords();
   renderer.render(scene, camera);
+  drawObjects();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -1725,7 +1946,7 @@ requestAnimationFrame(frame);
 // Comodo per esperimenti dalla console del browser, es.:
 //   globeApp.addMarker(45.07, 7.69, { color: 0x39ff7a })   // Torino
 //   globeApp.addMarker(0, -30, { altKm: 420 })             // "satellite" a 420 km
-window.globeApp = { THREE, scene, camera, earthPivot, satellitesLayer, latLonToVector3, addMarker, view, joy, sats, selectSat, refreshPositions, setObserver };
+window.globeApp = { THREE, scene, camera, earthPivot, satellitesLayer, latLonToVector3, addMarker, view, joy, sats, selectSat, refreshPositions, setObserver, allAbove, renderAllAbove, arm };
 </script>
 </body>
 </html>

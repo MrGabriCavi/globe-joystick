@@ -11,13 +11,9 @@ offline il globo mostra una griglia.
 
 ## Aprirla
 
-- **Dal PC:** doppio clic su `index.html`.
-- **Dal telefono:** avvia il server locale e apri dal telefono l'indirizzo che stampa
-  (stessa rete Wi-Fi). Il server mostra in rete solo `index.html`:
-
-  ```powershell
-  powershell -ExecutionPolicy Bypass -File .\avvia-server.ps1
-  ```
+- **Online, anche dal telefono:** <https://globe-stick.mrgabri.it>.
+- **In locale, per le prove:** doppio clic su `index.html`. Senza l'API la pagina chiede i dati
+  direttamente a CelesTrak: va bene ogni tanto, non a raffica (CelesTrak blocca l'IP).
 
 ## Comandi
 
@@ -29,7 +25,8 @@ offline il globo mostra una griglia.
 | Pulsante rosso, `R` | torna su Roma |
 | Pulsante giallo, `M` | modalità **VOLA** (su = nord, destra = est) o **RUOTA** (muovi il globo come con la mano) |
 | Menu in alto a sinistra | gruppo di satelliti: più luminosi, stazioni, meteo, GPS, Galileo, geostazionari, Starlink |
-| ◎ SOPRA DI ME | chiede la posizione e mostra i satelliti del gruppo più alti di 10° sul tuo orizzonte (anelli azzurri ed elenco). Sul sito pubblico aggiunge, da N2YO, *tutti* gli oggetti sopra di te, di qualunque gruppo (punti viola ed elenco). La posizione precisa il browser la dà solo al file aperto dal PC o a pagine https: dal telefono via `avvia-server.ps1` (http) si può usare quella approssimativa dalla rete |
+| ◎ SOPRA DI ME | chiede la posizione e mostra i satelliti del gruppo più alti di 10° sul tuo orizzonte (anelli azzurri ed elenco). Sul sito pubblico aggiunge, da N2YO, *tutti* gli oggetti sopra di te, di qualunque gruppo (icone piccole ed elenco, raggruppate in cluster che si aprono con lo zoom; tocca un cluster per avvicinarti). Se il browser non dà la posizione precisa si può usare quella approssimativa dalla rete |
+| Interruttore MASTER ARM nel pannello | in sicurezza (sportellino chiuso) si vedono solo satelliti e stazioni spaziali; armato compaiono anche stadi di razzo e detriti, nei gruppi e in SOPRA DI ME. La scelta resta nel browser |
 | ✦ VAI A ISS, `I` | porta il globo sopra la Stazione spaziale internazionale e apre la sua schedina; se il gruppo scelto non la contiene passa a «Stazioni spaziali» |
 | IL PIÙ VELOCE / LENTO / LONTANO / VICINO | porta il globo sul satellite del gruppo scelto più veloce, più lento, più lontano o più vicino alla Terra e apre la sua schedina |
 | Bandierina nel pannello comandi | passa dall'italiano all'inglese e viceversa; la prima volta la pagina segue la lingua del browser |
