@@ -1,0 +1,4 @@
+# Script e file per Linux: sempre LF, anche da Windows
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf

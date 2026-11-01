@@ -85,6 +85,9 @@
   .records { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
   .rec-btn { pointer-events: auto; font-size: 7px; padding: 7px 9px; color: var(--amber); border-color: #4a3a12; }
   .card-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .card-section { font: 9px/1.6 'Press Start 2P', monospace; color: #ff5fd2; margin-top: 8px; padding-top: 12px; border-top: 1px solid #22222a; }
+  .all-row span:last-child { color: #ff5fd2; }
+  .all-row:hover { border-color: #ff5fd2; }
   .card-list p { margin: 0 0 4px; font: 13px/1.45 system-ui, sans-serif; color: #c9c7c0; }
   .card-list .pill { align-self: flex-start; }
   .sat-row {
@@ -228,6 +231,7 @@
   <dl class="card-grid" id="cardLive"></dl>
   <dl class="card-grid" id="cardInfo"></dl>
   <div class="card-list" id="cardList" hidden></div>
+  <div class="card-list" id="cardAll" hidden></div>
   <div class="card-actions">
     <button class="pill" id="cardCenter" data-i18n="center">CENTRA</button>
     <a class="pill" id="cardN2yo" target="_blank" rel="noopener">N2YO ↗</a>
@@ -292,6 +296,11 @@ const STR = {
     fromNetwork: 'dalla rete', positionsAt: (at) => `posizioni delle ${at}`,
     ovSome: (n, g, min, when) => `${n} satelliti del gruppo «${g}» sono più alti di ${min}° sull'orizzonte (${when}). Tocca un nome per la scheda.`,
     ovNone: (g, min) => `Nessun satellite del gruppo «${g}» è più alto di ${min}° sull'orizzonte adesso. Prova un altro gruppo, per esempio Starlink.`,
+    allTitle: 'TUTTI GLI OGGETTI · N2YO', allLoading: 'Chiedo a N2YO tutto quello che hai sopra la testa…',
+    allSome: (n, min, at) => `${n} oggetti di ogni tipo (satelliti, stadi di razzo, detriti) sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}): sul globo sono i punti viola. Tocca un nome per andarci.`,
+    allMore: (n) => `…e altri ${n}.`, allNone: 'N2YO non vede niente sopra di te adesso.',
+    allBusy: 'Troppe richieste a N2YO in questo momento: riprova fra qualche minuto.',
+    allUnavailable: 'Elenco completo non disponibile in questo momento.', allCredit: 'Dati di N2YO.com ↗',
   },
   en: {
     loading: 'LOADING…', webglUnavailable: 'WEBGL UNAVAILABLE', textureOffline: 'TEXTURE OFFLINE',
@@ -321,6 +330,11 @@ const STR = {
     fromNetwork: 'from the network', positionsAt: (at) => `positions at ${at}`,
     ovSome: (n, g, min, when) => `${n} satellites in «${g}» are more than ${min}° above the horizon (${when}). Tap a name for details.`,
     ovNone: (g, min) => `No satellite in «${g}» is more than ${min}° above the horizon right now. Try another group, for example Starlink.`,
+    allTitle: 'EVERYTHING · N2YO', allLoading: 'Asking N2YO for everything above your head…',
+    allSome: (n, min, at) => `${n} objects of every kind (satellites, rocket bodies, debris) are more than ${min}° above the horizon (positions at ${at}): they are the purple dots on the globe. Tap a name to go there.`,
+    allMore: (n) => `…and ${n} more.`, allNone: 'N2YO sees nothing above you right now.',
+    allBusy: 'Too many requests to N2YO right now: try again in a few minutes.',
+    allUnavailable: 'Full list unavailable right now.', allCredit: 'Data from N2YO.com ↗',
   },
 };
 let lang = 'it';
@@ -983,17 +997,35 @@ function parseGp(rows) {
   return out;
 }
 
+// Primo indirizzo che risponde con un array JSON non vuoto.
+async function fetchJsonArray(urls) {
+  let last = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      const text = await res.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch { /* agli errori CelesTrak risponde con testo semplice */ }
+      if (res.ok && Array.isArray(json) && json.length) return json;
+      last = new Error(text.slice(0, 160) || 'HTTP ' + res.status);
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last;
+}
+
+// Prima l'API del sito, che tiene una copia dei dati di CelesTrak (api/server.py): così CelesTrak
+// non vede un download per ogni visitatore e non risponde 403 a chi condivide l'IP con altri.
+// Dove l'API non c'è (file aperto dal PC, avvia-server.ps1) si chiede direttamente a CelesTrak.
 async function fetchGp(group) {
   const key = 'gp:' + group;
   let cached = null;
   try { cached = JSON.parse(localStorage.getItem(key)); } catch { /* storage non disponibile */ }
   if (cached && Date.now() - cached.t < GP_MAX_AGE_MS) return cached;
   try {
-    const res = await fetch(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${encodeURIComponent(group)}&FORMAT=json`);
-    const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch { /* agli errori CelesTrak risponde con testo semplice */ }
-    if (!res.ok || !Array.isArray(json) || !json.length) throw new Error(text.slice(0, 120) || 'HTTP ' + res.status);
+    const g = encodeURIComponent(group);
+    const json = await fetchJsonArray([`api/gp/${g}`, `https://celestrak.org/NORAD/elements/gp.php?GROUP=${g}&FORMAT=json`]);
     const data = { t: Date.now(), rows: json.map((o) => GP_FIELDS.map((k) => o[k])) };
     try { localStorage.setItem(key, JSON.stringify(data)); } catch { /* cache piena: pazienza */ }
     return data;
@@ -1260,6 +1292,7 @@ function setCardMode(mode) {
   card.hidden = false;
   for (const id of ['cardLive', 'cardInfo', 'cardN2yo']) $(id).hidden = mode !== 'sat';
   $('cardList').hidden = mode !== 'overhead';
+  $('cardAll').hidden = true;   // la sezione N2YO la mostra renderAllAbove
   $('cardImg').hidden = $('cardImgCredit').hidden = $('cardDesc').hidden = $('cardWiki').hidden = true;
   card.scrollTop = 0;
 }
@@ -1281,8 +1314,20 @@ $('cardCenter').addEventListener('click', () => {
   else if (s && s.ok) view.homing = geoToView(s.lat, s.lon);
 });
 
-const satcatCache = new Map(), wikiCache = new Map();
-function getSatcat(id) {
+// Catalogo: dall'API del sito un file per gruppo, scaricato alla prima schedina. Dove l'API non
+// c'è, CelesTrak un oggetto alla volta (in locale soltanto: molte schede di fila fanno bloccare l'IP).
+const satcatGroups = new Map(), satcatCache = new Map(), wikiCache = new Map();
+function getSatcatGroup(group) {
+  if (!satcatGroups.has(group)) {
+    satcatGroups.set(group, fetchJsonArray([`api/satcat/${encodeURIComponent(group)}`])
+      .then((a) => new Map(a.map((o) => [o.NORAD_CAT_ID, o])))
+      .catch(() => { satcatGroups.delete(group); return null; }));
+  }
+  return satcatGroups.get(group);
+}
+async function getSatcat(id) {
+  const byId = await getSatcatGroup(sats.group);
+  if (byId) return byId.get(id) || null;
   if (!satcatCache.has(id)) {
     satcatCache.set(id, fetch(`https://celestrak.org/satcat/records.php?CATNR=${id}&FORMAT=json`)
       .then((r) => r.json()).then((a) => a[0] || null).catch(() => null));
@@ -1391,6 +1436,7 @@ function renderOverheadCard(msgKey, offerApprox, detailKey) {
   const o = sats.observer, list = $('cardList');
   $('cardTitle').textContent = t('aboveYou');
   delete list.dataset.ids;
+  renderAllAbove();
   if (!o) {
     $('cardSub').textContent = '';
     list.replaceChildren(para(t(msgKey || 'ovLocating', detailKey && t(detailKey))));
@@ -1454,6 +1500,77 @@ function setObserver(o) {
   view.zoomTarget = 1.5;
   updateOverhead();
   renderOverheadCard();
+  loadAllAbove();
+}
+
+/* ---------- Sopra di me, tutti gli oggetti di ogni gruppo: N2YO tramite l'API del sito ----------
+   N2YO dà solo la posizione al momento della richiesta (niente elementi orbitali): punti fermi
+   sul globo, in viola, e un elenco. Si aggiorna premendo di nuovo SOPRA DI ME. */
+const ALL_MAX_ROWS = 40;
+const allAbove = { list: [], at: 0, state: 'idle' };   // state: idle, loading, ok o la chiave di un errore
+const allDots = pointsLayer({ size: 5, color: 0xff5fd2, opacity: 0.9 });
+async function loadAllAbove() {
+  const o = sats.observer;
+  if (!o) return;
+  allAbove.state = 'loading';
+  renderAllAbove();
+  try {
+    const res = await fetch(`api/above?lat=${o.lat.toFixed(3)}&lon=${o.lon.toFixed(3)}`);
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(res.status === 429 ? 'allBusy' : 'allUnavailable');
+    const gd = { latitude: o.lat * DEG, longitude: o.lon * DEG, height: 0.1 };
+    allAbove.list = (j.above || []).map((a) => {
+      const ecf = sat.geodeticToEcf({ latitude: a.satlat * DEG, longitude: a.satlng * DEG, height: a.satalt });
+      const la = sat.ecfToLookAngles(gd, ecf);
+      return {
+        id: a.satid, name: a.satname, lat: a.satlat, lon: a.satlng, alt: a.satalt,
+        el: la.elevation / DEG, az: la.azimuth / DEG, pos: ecfToScene(ecf, new THREE.Vector3()),
+      };
+    }).filter((x) => x.el >= MIN_ELEVATION).sort((a, b) => b.el - a.el);
+    allAbove.at = j.at * 1000;
+    allAbove.state = 'ok';
+  } catch (err) {
+    allAbove.list = [];
+    allAbove.state = STR[lang][err.message] ? err.message : 'allUnavailable';
+  }
+  setPositions(allDots, new Float32Array(allAbove.list.flatMap(({ pos }) => [pos.x, pos.y, pos.z])));
+  renderAllAbove();
+}
+function renderAllAbove() {
+  const box = $('cardAll');
+  box.hidden = card.dataset.mode !== 'overhead' || !sats.observer || allAbove.state === 'idle';
+  if (box.hidden) return;
+  const title = document.createElement('div');
+  title.className = 'card-section';
+  title.textContent = t('allTitle');
+  if (allAbove.state !== 'ok') { box.replaceChildren(title, para(t(allAbove.state === 'loading' ? 'allLoading' : allAbove.state))); return; }
+  const compass = t('compass');
+  const rows = allAbove.list.slice(0, ALL_MAX_ROWS).map((x) => {
+    const b = document.createElement('button');
+    b.className = 'sat-row all-row';
+    const name = document.createElement('span'), info = document.createElement('span');
+    name.textContent = x.name;
+    info.textContent = `${fmt(x.el)}° ${compass[Math.round(x.az / 45) % 8]} · ${fmt(x.alt)} km`;
+    b.append(name, info);
+    // Se è anche nel gruppo scelto apre la sua schedina, altrimenti porta il globo sopra di lui.
+    b.addEventListener('click', () => {
+      const s = sats.list.find((y) => y.id === x.id);
+      if (s && s.ok) flyTo(s); else view.homing = geoToView(x.lat, x.lon);
+    });
+    return b;
+  });
+  const credit = document.createElement('a');
+  credit.className = 'card-credit';
+  credit.href = 'https://www.n2yo.com/';
+  credit.target = '_blank'; credit.rel = 'noopener';
+  credit.textContent = t('allCredit');
+  box.replaceChildren(
+    title,
+    para(allAbove.list.length ? t('allSome', allAbove.list.length, MIN_ELEVATION, hhmm(allAbove.at)) : t('allNone')),
+    ...rows,
+    ...(allAbove.list.length > ALL_MAX_ROWS ? [para(t('allMore', allAbove.list.length - ALL_MAX_ROWS))] : []),
+    credit,
+  );
 }
 
 $('btnOverhead').addEventListener('click', async () => {

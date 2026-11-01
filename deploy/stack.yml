@@ -1,0 +1,67 @@
+version: "3.8"
+
+# Stack Swarm di globe-joystick su https://globe-stick.mrgabri.it, usato dal deployer della VPS
+# (~/stacks/deploy/deploy.sh) a ogni tag di versione vX.Y.Z. La versione arriva in $TAG.
+#   site  nginx con la pagina (Dockerfile nella radice)
+#   api   /api/: copia dei dati di CelesTrak e proxy di N2YO (api/)
+# Serve https: il pulsante "SOPRA DI ME" usa la geolocalizzazione del browser.
+#
+# Prima del primo deploy con questo file serve il segreto Docker globe_n2yo_api_key
+# (chiave dell'API di N2YO, vedi README, "Pubblicazione").
+
+services:
+  site:
+    image: globe-joystick:${TAG:-latest}
+    networks:
+      - traefik-public
+    deploy:
+      replicas: 1
+      update_config:
+        order: start-first
+        failure_action: rollback
+      labels:
+        - "traefik.enable=true"
+        - "traefik.swarm.network=traefik-public"
+        - "traefik.http.routers.globe.rule=Host(`globe-stick.mrgabri.it`)"
+        - "traefik.http.routers.globe.entrypoints=websecure"
+        - "traefik.http.routers.globe.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.globe.middlewares=basic-security-headers@file"
+        - "traefik.http.services.globe.loadbalancer.server.port=80"
+
+  api:
+    image: globe-joystick-api:${TAG:-latest}
+    volumes:
+      - data:/data
+    secrets:
+      - n2yo_api_key
+    networks:
+      - traefik-public
+    deploy:
+      # Uno solo, e il vecchio si ferma prima che parta il nuovo: due copie scaricherebbero
+      # due volte da CelesTrak e conterebbero a parte le chiamate a N2YO.
+      replicas: 1
+      update_config:
+        order: stop-first
+        failure_action: rollback
+      labels:
+        - "traefik.enable=true"
+        - "traefik.swarm.network=traefik-public"
+        # Regola più lunga di quella del sito: per Traefik ha la precedenza
+        - "traefik.http.routers.globe-api.rule=Host(`globe-stick.mrgabri.it`) && PathPrefix(`/api/`)"
+        - "traefik.http.routers.globe-api.entrypoints=websecure"
+        - "traefik.http.routers.globe-api.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.globe-api.middlewares=basic-security-headers@file"
+        - "traefik.http.routers.globe-api.service=globe-api"
+        - "traefik.http.services.globe-api.loadbalancer.server.port=8000"
+
+volumes:
+  data:
+
+networks:
+  traefik-public:
+    external: true
+
+secrets:
+  n2yo_api_key:
+    external: true
+    name: globe_n2yo_api_key
