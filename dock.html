@@ -398,7 +398,7 @@ const LEVELS = {   // rotazione della stazione (°/s), distanza e scostamento la
 const LEVEL_KEYS = { calm: 'lvCalm', slow: 'lvSlow', fast: 'lvFast', tumble: 'lvTumble' };
 const TOL = { lat: 0.25, speed: 0.35, roll: 5, rate: 3 };   // all'aggancio: m, m/s, °, °/s
 const LAT_ACC = 0.25, AX_ACC = 0.3, ROLL_ACC = 12 * DEG;    // propulsori a sensibilità 1: m/s², m/s², rad/s²
-const FUEL_BURN = 2.2;   // % di RCS al secondo con un comando al massimo
+const FUEL_BURN = 1;     // % di RCS al secondo con un comando al massimo: 100 s di spinta piena su un asse
 const LOST_MARGIN = 60;  // m oltre la distanza iniziale: la stazione è persa
 const ASSIST_MAX_SPEED = 2;   // m/s, avanti e indietro, con il movimento ASSIST
 
