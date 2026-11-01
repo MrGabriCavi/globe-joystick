@@ -1742,7 +1742,10 @@ async function loadAllAbove() {
   allAbove.state = 'loading';
   renderAllAbove();
   try {
-    const res = await fetch(`api/above?lat=${o.lat.toFixed(3)}&lon=${o.lon.toFixed(3)}`);
+    // Al server la posizione arriva già arrotondata a mezzo grado (circa 50 km), come dice
+    // l'informativa; per il calcolo dell'elevazione qui sotto resta quella precisa.
+    const half = (v) => (Math.round(v * 2) / 2).toFixed(1);
+    const res = await fetch(`api/above?lat=${half(o.lat)}&lon=${half(o.lon)}`);
     const j = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(res.status === 429 ? 'allBusy' : 'allUnavailable');
     const gd = { latitude: o.lat * DEG, longitude: o.lon * DEG, height: 0.1 };
