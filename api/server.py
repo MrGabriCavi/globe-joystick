@@ -18,6 +18,7 @@ orario sotto il limite, un limite per IP del visitatore e solo richieste dalla p
 Solo libreria standard: niente dipendenze da installare.
 """
 import gzip
+import ipaddress
 import json
 import os
 import re
@@ -51,6 +52,17 @@ N2YO_HOURLY = 90       # tetto nostro, sotto le 100 chiamate all'ora concesse da
 ABOVE_TTL = 120        # secondi di vita di una risposta in memoria
 ABOVE_GRID = 0.5       # gradi: il punto si arrotonda (cache comune, e N2YO non riceve la posizione esatta)
 PER_IP_PER_MIN = 6
+
+# Reti di Cloudflare (https://www.cloudflare.com/ips/). Solo se la connessione arriva da qui
+# CF-Connecting-IP è affidabile: la VPS risponde anche chiamata direttamente, e chi lo fa può
+# scrivere in quell'intestazione l'IP che vuole per aggirare il limite per visitatore.
+CLOUDFLARE_NETS = [ipaddress.ip_network(n) for n in (
+    '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18',
+    '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17',
+    '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14', '172.64.0.0/13', '131.0.72.0/22',
+    '2400:cb00::/32', '2606:4700::/32', '2803:f800::/32', '2405:b500::/32', '2405:8100::/32',
+    '2a06:98c0::/29', '2c0f:f248::/32',
+)]
 
 
 def log(msg):
@@ -137,7 +149,10 @@ except OSError:
 n2yo_lock = threading.Lock()
 n2yo_calls = deque()   # orari delle chiamate a N2YO nell'ultima ora
 above_cache = {}       # (lat, lon) arrotondati -> (ora, risposta)
+above_inflight = {}    # (lat, lon) arrotondati -> Event di una chiamata a N2YO in corso
 ip_hits = defaultdict(deque)
+ip_pruned_at = 0.0
+NO_ANSWER = b'{"error":"N2YO non risponde"}'
 
 
 def snap(v):
@@ -150,11 +165,29 @@ def above(lat, lon):
         hit = above_cache.get(key)
         if hit and now - hit[0] < ABOVE_TTL:
             return 200, hit[1]
-        while n2yo_calls and now - n2yo_calls[0] > 3600:
-            n2yo_calls.popleft()
-        if len(n2yo_calls) >= N2YO_HOURLY:
-            return 429, b'{"error":"troppe richieste a N2YO in questa ora"}'
-        n2yo_calls.append(now)
+        # Se la stessa chiamata è già partita per un altro visitatore, si aspetta quella invece di
+        # farne una seconda: con molte richieste insieme il tetto orario si consumerebbe in fretta.
+        pending = above_inflight.get(key)
+        if not pending:
+            while n2yo_calls and now - n2yo_calls[0] > 3600:
+                n2yo_calls.popleft()
+            if len(n2yo_calls) >= N2YO_HOURLY:
+                return 429, b'{"error":"troppe richieste a N2YO in questa ora"}'
+            n2yo_calls.append(now)
+            above_inflight[key] = threading.Event()
+    if pending:
+        pending.wait(timeout=35)
+        with n2yo_lock:
+            hit = above_cache.get(key)
+        return (200, hit[1]) if hit else (502, NO_ANSWER)
+    try:
+        return fetch_above(key, now)
+    finally:
+        with n2yo_lock:
+            above_inflight.pop(key).set()
+
+
+def fetch_above(key, now):
     url = (f'https://api.n2yo.com/rest/v1/satellite/above/{key[0]}/{key[1]}/0/{N2YO_RADIUS}/0/'
            f'&apiKey={urllib.parse.quote(N2YO_KEY)}')
     try:
@@ -162,13 +195,18 @@ def above(lat, lon):
             j = json.loads(res.read())
     except Exception as err:   # nel log mai l'URL: contiene la chiave
         log(f'ERRORE N2YO above: {type(err).__name__} {getattr(err, "code", "")}')
-        return 502, b'{"error":"N2YO non risponde"}'
+        return 502, NO_ANSWER
+    # Risposta di forma inattesa (null, lista, "above" che non è una lista…): errore pulito, non un'eccezione
+    if not isinstance(j, dict) or not isinstance(j.get('above') or [], list):   # null = niente sopra
+        log(f'ERRORE N2YO above: risposta inattesa ({type(j).__name__})')
+        return 502, b'{"error":"risposta di N2YO non valida"}'
     if 'error' in j:
-        log(f'ERRORE N2YO above: {j["error"]}')
+        log(f'ERRORE N2YO above: {str(j["error"])[:200]}')
         return 502, b'{"error":"N2YO ha rifiutato la richiesta"}'
-    log(f'N2YO above: {len(j.get("above") or [])} oggetti, '
-        f'{j.get("info", {}).get("transactionscount", "?")} chiamate nell\'ultima ora')
-    payload = json.dumps({'at': int(now), 'lat': key[0], 'lon': key[1], 'above': j.get('above') or []},
+    objects = [o for o in j.get('above') or [] if isinstance(o, dict)]
+    info = j.get('info') if isinstance(j.get('info'), dict) else {}
+    log(f'N2YO above: {len(objects)} oggetti, {info.get("transactionscount", "?")} chiamate nell\'ultima ora')
+    payload = json.dumps({'at': int(now), 'lat': key[0], 'lon': key[1], 'above': objects},
                          separators=(',', ':')).encode()
     with n2yo_lock:
         for k in [k for k, (t, _) in above_cache.items() if now - t >= ABOVE_TTL]:
@@ -183,10 +221,15 @@ class Handler(BaseHTTPRequestHandler):
     sys_version = ''
 
     def client_ip(self):
-        # Il container è raggiungibile solo da Traefik, dietro Cloudflare: l'IP vero è nelle intestazioni.
-        return (self.headers.get('CF-Connecting-IP')
-                or (self.headers.get('X-Forwarded-For') or '').split(',')[0].strip()
-                or self.client_address[0])
+        # Traefik scrive in X-Forwarded-For l'indirizzo di chi gli si è collegato davvero (quello
+        # mandato dal client lo scarta). Se è Cloudflare, il visitatore è in CF-Connecting-IP;
+        # altrimenti è quell'indirizzo stesso, e un CF-Connecting-IP inventato non conta.
+        remote = (self.headers.get('X-Forwarded-For') or '').split(',')[-1].strip() or self.client_address[0]
+        try:
+            via_cloudflare = any(ipaddress.ip_address(remote) in net for net in CLOUDFLARE_NETS)
+        except ValueError:
+            via_cloudflare = False
+        return (via_cloudflare and self.headers.get('CF-Connecting-IP', '').strip()) or remote
 
     def reply(self, code, body, gz=None, cache='no-store'):
         use_gz = gz is not None and 'gzip' in (self.headers.get('Accept-Encoding') or '')
@@ -220,7 +263,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.handle_above(urllib.parse.parse_qs(url.query))
         self.fail(404, 'non trovato')
 
-    do_HEAD = do_GET
+    def do_HEAD(self):
+        # Su /api/above una HEAD farebbe partire una chiamata vera a N2YO senza restituire niente.
+        if urllib.parse.urlsplit(self.path).path == '/api/above':
+            return self.fail(405, 'usa GET')
+        return self.do_GET()
 
     def handle_above(self, query):
         # Solo dalla pagina del sito: i browser lo dichiarano con Origin e Sec-Fetch-Site. Chi chiama a
@@ -230,8 +277,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.fail(403, 'solo dalla pagina del sito')
         if not N2YO_KEY:
             return self.fail(503, 'N2YO non configurato')
+        global ip_pruned_at
         now, hits = time.time(), ip_hits[self.client_ip()]
         with n2yo_lock:
+            # Una volta al minuto via i visitatori senza richieste nell'ultimo minuto: la tabella
+            # non cresce all'infinito e non tiene gli IP più del necessario.
+            if now - ip_pruned_at > 60:
+                for ip in [ip for ip, d in ip_hits.items() if not d or now - d[-1] > 60]:
+                    if ip_hits[ip] is not hits:
+                        del ip_hits[ip]
+                ip_pruned_at = now
             while hits and now - hits[0] > 60:
                 hits.popleft()
             if len(hits) >= PER_IP_PER_MIN:

@@ -1202,7 +1202,11 @@ function refreshPositions() {
   updateSelectedOrbit();
 }
 
+// Ogni caricamento ha un numero: vale solo la risposta (o l'errore) dell'ultimo, anche se nel
+// frattempo si è tornati allo stesso gruppo (A, poi B, poi di nuovo A).
+let groupReq = 0;
 async function loadGroup(group) {
+  const req = ++groupReq;
   sats.group = group;
   sats.list = [];
   sats.error = '';
@@ -1214,12 +1218,13 @@ async function loadGroup(group) {
   updateSatInfo();
   try {
     const data = await fetchGp(group);
-    if (sats.group !== group) return;   // nel frattempo è stato scelto un altro gruppo
+    if (req !== groupReq) return;   // nel frattempo è partito un altro caricamento
     sats.list = parseGp(data.rows);
     sats.gpAt = data.t;
     refreshPositions();
     fitZoomToGroup();
   } catch (err) {
+    if (req !== groupReq) return;
     console.error(err);
     sats.error = 'dataUnavailable';
   }
@@ -1248,6 +1253,9 @@ async function tick() {
           sats.gpAt = data.t;
           sats.selected = sats.list.find((s) => s.id === selId) || null;
           if (!sats.selected && card.dataset.mode === 'sat') closeCard();
+          // Il satellite selezionato ora è un oggetto nuovo: i dettagli ancora in arrivo per il
+          // vecchio verrebbero scartati, quindi si richiedono (sono in cache, costa poco).
+          else if (sats.selected && !card.hidden && card.dataset.mode === 'sat') loadDetails(sats.selected);
         }
       }
       refreshPositions();
@@ -1554,8 +1562,14 @@ function renderOverheadCard(msgKey, offerApprox, detailKey) {
       b.className = 'pill';
       b.textContent = t('ovUseApprox');
       b.addEventListener('click', async () => {
+        const req = ++locationReq;
         renderOverheadCard('ovAskingApprox');
-        try { setObserver(await approxLocation()); } catch { renderOverheadCard('ovApproxFail'); }
+        try {
+          const o = await approxLocation();
+          if (stillAsking(req)) setObserver(o);
+        } catch {
+          if (stillAsking(req)) renderOverheadCard('ovApproxFail');
+        }
       });
       list.append(para(t('ovOfferApprox')), b);
     }
@@ -1736,8 +1750,9 @@ function tapObjects(cx, cy, slop) {
   return true;
 }
 
+let allReq = 0;   // vale solo la risposta dell'ultima richiesta, come per i gruppi
 async function loadAllAbove() {
-  const o = sats.observer;
+  const o = sats.observer, req = ++allReq;
   if (!o) return;
   allAbove.state = 'loading';
   renderAllAbove();
@@ -1747,6 +1762,7 @@ async function loadAllAbove() {
     const half = (v) => (Math.round(v * 2) / 2).toFixed(1);
     const res = await fetch(`api/above?lat=${half(o.lat)}&lon=${half(o.lon)}`);
     const j = await res.json().catch(() => ({}));
+    if (req !== allReq) return;
     if (!res.ok) throw new Error(res.status === 429 ? 'allBusy' : 'allUnavailable');
     const gd = { latitude: o.lat * DEG, longitude: o.lon * DEG, height: 0.1 };
     allAbove.list = (j.above || []).map((a) => {
@@ -1760,6 +1776,7 @@ async function loadAllAbove() {
     allAbove.at = j.at * 1000;
     allAbove.state = 'ok';
   } catch (err) {
+    if (req !== allReq) return;
     allAbove.list = [];
     allAbove.state = STR[lang][err.message] ? err.message : 'allUnavailable';
   }
@@ -1804,16 +1821,23 @@ function renderAllAbove() {
   );
 }
 
+// La posizione può arrivare dopo parecchi secondi: si usa solo se è l'ultima chiesta e la
+// schedina "sopra di me" è ancora aperta, altrimenti sposterebbe il globo e riaprirebbe la
+// schedina mentre si sta facendo altro.
+let locationReq = 0;
+const stillAsking = (req) => req === locationReq && !card.hidden && card.dataset.mode === 'overhead';
 $('btnOverhead').addEventListener('click', async () => {
   sats.selected = null;
   updateSelection();
   updateSelectedOrbit();
+  const req = ++locationReq;
   if (sats.observer) { setObserver(sats.observer); return; }
   renderOverheadCard();
   try {
-    setObserver(await preciseLocation());
+    const o = await preciseLocation();
+    if (stillAsking(req)) setObserver(o);
   } catch (err) {
-    renderOverheadCard('ovPreciseFail', true, STR[lang][err.message] ? err.message : 'geoUnavailable');
+    if (stillAsking(req)) renderOverheadCard('ovPreciseFail', true, STR[lang][err.message] ? err.message : 'geoUnavailable');
   }
 });
 

@@ -16,6 +16,9 @@ services:
       - traefik-public
     deploy:
       replicas: 1
+      resources:
+        limits:
+          memory: 64M
       update_config:
         order: start-first
         failure_action: rollback
@@ -40,6 +43,9 @@ services:
       # Uno solo, e il vecchio si ferma prima che parta il nuovo: due copie scaricherebbero
       # due volte da CelesTrak e conterebbero a parte le chiamate a N2YO.
       replicas: 1
+      resources:
+        limits:
+          memory: 256M   # Starlink compreso, ne usa una frazione
       update_config:
         order: stop-first
         failure_action: rollback

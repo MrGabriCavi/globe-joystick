@@ -374,7 +374,13 @@ for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute(
 
 // ---------------------------------------------------------------- regolazioni
 const settings = { sens: 1, assist: true, invert: false };
-try { Object.assign(settings, JSON.parse(localStorage.getItem('dockSettings')) || {}); } catch { /* ok */ }
+try {
+  // Valori salvati controllati uno per uno: uno rovinato non deve bloccare i comandi.
+  const saved = JSON.parse(localStorage.getItem('dockSettings')) || {};
+  if (Number.isFinite(saved.sens)) settings.sens = Math.max(0.25, Math.min(2, saved.sens));
+  if (typeof saved.assist === 'boolean') settings.assist = saved.assist;
+  if (typeof saved.invert === 'boolean') settings.invert = saved.invert;
+} catch { /* storage non disponibile o valore non valido: restano i predefiniti */ }
 const saveSettings = () => { try { localStorage.setItem('dockSettings', JSON.stringify(settings)); } catch { /* ok */ } };
 function showSettings() {
   $('sens').value = settings.sens;
