@@ -16,7 +16,7 @@
     --red: #ff2a2a;
     --amber: #ffb000;
     --green: #39ff7a;
-    --stick: clamp(130px, min(40vw, 34vh), 220px);
+    --stick: clamp(140px, min(44vw, 36vh), 250px);
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
@@ -106,7 +106,7 @@
     right: calc(16px + env(safe-area-inset-right));
     bottom: calc(16px + env(safe-area-inset-bottom));
     display: flex; align-items: center; gap: 18px;
-    padding: 20px 20px 16px;
+    padding: 20px 20px 38px;   /* sotto, lo spazio per la bandierina */
     background: linear-gradient(#18181e, #09090c);
     border: 1px solid #2a2a33; border-radius: 18px;
     box-shadow: 0 12px 40px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.06);
@@ -122,9 +122,9 @@
     font-size: 6px; color: #4a4a55; letter-spacing: 1px;
   }
 
-  /* Bandierina della lingua, in alto a destra nel pannello: mostra la lingua in cui si passa */
+  /* Bandierina della lingua, in basso a destra nel pannello: mostra la lingua in cui si passa */
   .lang-btn {
-    position: absolute; top: 9px; right: 20px; width: 24px; height: 16px; padding: 0;
+    position: absolute; bottom: 9px; right: 20px; width: 30px; height: 20px; padding: 0;
     border: 1px solid #3a3a44; border-radius: 3px; overflow: hidden; cursor: pointer;
     background: #111; opacity: .8; transition: opacity .1s, transform .1s;
   }
@@ -170,9 +170,10 @@
   @media (max-aspect-ratio: 1/1) {
     .deck {
       left: 0; right: 0; bottom: 0; justify-content: space-evenly; gap: 6px;
-      padding: 22px 10px calc(14px + env(safe-area-inset-bottom));
+      padding: 22px 10px calc(36px + env(safe-area-inset-bottom));
       border-radius: 18px 18px 0 0; border-bottom: 0;
     }
+    .lang-btn { bottom: calc(8px + env(safe-area-inset-bottom)); right: 14px; }
     .hint { display: none; }
     .card {
       right: calc(12px + env(safe-area-inset-right));
@@ -560,7 +561,7 @@ const joy = {
   keys: new Set(),
   dirty: true,
 };
-const KNOB_TRAVEL = 0.27;      // escursione del pomello, in frazione del lato
+const KNOB_TRAVEL = 0.27;      // trascinando, spostamento del dito per la leva tutta spinta (frazione del lato)
 const SPRING_K = 260, SPRING_C = 24; // ritorno al centro: leggermente sotto-smorzato
 
 function sizeStick() {
@@ -655,7 +656,7 @@ function stickOutput() {
 function circle(x, y, r) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); }
 
 function drawStick() {
-  const S = stick.width, c = S / 2, travel = S * KNOB_TRAVEL;
+  const S = stick.width, c = S / 2;
   g.clearRect(0, 0, S, S);
 
   // Piastra di base
@@ -677,66 +678,115 @@ function drawStick() {
     g.beginPath(); g.moveTo(x - sr * 0.6, y + sr * 0.6); g.lineTo(x + sr * 0.6, y - sr * 0.6); g.stroke();
   }
 
-  // Guida ottagonale (gate) e tacche delle 8 direzioni
-  const gateR = travel + S * 0.075;
-  g.beginPath();
+  // Cloche da caccia vista dal posto di pilotaggio: da dietro e un po' dall'alto (EYE sopra
+  // l'orizzonte). L'asta ruota attorno al perno: spinta in avanti la cima si allontana, sullo
+  // schermo sale e si allunga; tirata indietro viene verso chi guarda e si accorcia.
+  // Z: scala della cloche rispetto al riquadro (le misure qui sotto sono frazioni di Z).
+  const Z = S * 1.2, EYE = 40 * DEG, TILT = 22 * DEG, L = Z * 0.42, FLAT = Math.sin(EYE);   // FLAT: cerchi a terra → ellissi
+  const px = c, py = c + S * 0.22;
+  const a = joy.y * TILT, b = joy.x * TILT;
+  const tx = px + L * Math.sin(b), ty = py - L * Math.cos(a - EYE) * Math.cos(b);
+  const dx = tx - px, dy = ty - py, len = Math.hypot(dx, dy), ang = Math.atan2(dx, -dy);
+  const at = (f) => [px + dx * f, py + dy * f];   // punto lungo l'asta, f = 0 perno … 1 cima
+
+  // Pozzetto con le tacche delle 8 direzioni
+  const wr = Z * 0.27;
+  g.beginPath(); g.ellipse(px, py, wr, wr * FLAT, 0, 0, Math.PI * 2);
+  gr = g.createRadialGradient(px, py, 0, px, py, wr);
+  gr.addColorStop(0, '#020203'); gr.addColorStop(1, '#16161b');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = Z * 0.008; g.stroke();
+  g.strokeStyle = 'rgba(255,176,0,.4)'; g.lineWidth = Z * 0.01; g.lineCap = 'round';
   for (let i = 0; i < 8; i++) {
-    const a = Math.PI / 8 + i * Math.PI / 4, r = gateR / Math.cos(Math.PI / 8);
-    g[i ? 'lineTo' : 'moveTo'](c + Math.cos(a) * r, c + Math.sin(a) * r);
-  }
-  g.closePath();
-  gr = g.createRadialGradient(c, c, gateR * 0.2, c, c, gateR * 1.1);
-  gr.addColorStop(0, '#050506'); gr.addColorStop(1, '#141418');
-  g.fillStyle = gr; g.fill();
-  g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = S * 0.008; g.stroke();
-  g.strokeStyle = 'rgba(255,176,0,.35)'; g.lineWidth = S * 0.01; g.lineCap = 'round';
-  for (let i = 0; i < 8; i++) {
-    const a = i * Math.PI / 4;
-    g.beginPath();
-    g.moveTo(c + Math.cos(a) * gateR * 0.86, c + Math.sin(a) * gateR * 0.86);
-    g.lineTo(c + Math.cos(a) * gateR * 0.95, c + Math.sin(a) * gateR * 0.95);
-    g.stroke();
+    const th = i * Math.PI / 4, cx = Math.cos(th), sy = Math.sin(th) * FLAT;
+    g.beginPath(); g.moveTo(px + cx * wr * 0.84, py + sy * wr * 0.84); g.lineTo(px + cx * wr * 0.95, py + sy * wr * 0.95); g.stroke();
   }
 
-  // Parapolvere
-  circle(c, c, S * 0.115);
-  gr = g.createRadialGradient(c, c - S * 0.03, 0, c, c, S * 0.115);
-  gr.addColorStop(0, '#2c2c30'); gr.addColorStop(1, '#030303');
-  g.fillStyle = gr; g.fill();
+  // Ombra della cloche sul pozzetto
+  const [shx, shy] = [px + dx * 0.35 + Z * 0.05, py + Z * 0.03];
+  g.save(); g.translate(shx, shy); g.scale(1, FLAT * 0.8);
+  gr = g.createRadialGradient(0, 0, 0, 0, 0, Z * 0.2);
+  gr.addColorStop(0, 'rgba(0,0,0,.6)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; circle(0, 0, Z * 0.2); g.fill();
+  g.restore();
 
-  const kx = c + joy.x * travel, ky = c - joy.y * travel;
-  const br = S * 0.155 * (1 - 0.05 * Math.hypot(joy.x, joy.y));
-
-  // Ombra del pomello sulla piastra
-  const shx = c + joy.x * travel * 0.7 + S * 0.035, shy = c - joy.y * travel * 0.7 + S * 0.05;
-  gr = g.createRadialGradient(shx, shy, 0, shx, shy, br * 1.3);
-  gr.addColorStop(0, 'rgba(0,0,0,.55)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = gr; circle(shx, shy, br * 1.3); g.fill();
-
-  // Asta metallica
-  const dx = kx - c, dy = ky - c, len = Math.hypot(dx, dy);
-  if (len > 1) {
-    const sw = S * 0.065, nx = -dy / len * sw / 2, ny = dx / len * sw / 2;
-    gr = g.createLinearGradient(c + nx, c + ny, c - nx, c - ny);
-    gr.addColorStop(0, '#5a5a60'); gr.addColorStop(0.35, '#f2f2f2'); gr.addColorStop(0.7, '#8a8a90'); gr.addColorStop(1, '#2e2e33');
-    g.strokeStyle = gr; g.lineWidth = sw; g.lineCap = 'round';
-    g.beginPath(); g.moveTo(c, c); g.lineTo(kx, ky); g.stroke();
+  // Cuffia di gomma a soffietto: anelli sempre più stretti che seguono l'inclinazione
+  const RINGS = 6;
+  for (let i = 0; i <= RINGS; i++) {
+    const f = i / RINGS * 0.2, r = Z * (0.17 - i * 0.017), [x, y] = at(f);
+    g.beginPath(); g.ellipse(x, y, r, r * FLAT, ang * 0.6, 0, Math.PI * 2);
+    gr = g.createLinearGradient(x - r, y - r * FLAT, x + r, y + r * FLAT);
+    gr.addColorStop(0, i % 2 ? '#2a2b2f' : '#34353a'); gr.addColorStop(1, '#060607');
+    g.fillStyle = gr; g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = Z * 0.006; g.stroke();
   }
-  circle(c, c, S * 0.042);
-  gr = g.createRadialGradient(c - S * 0.012, c - S * 0.012, 0, c, c, S * 0.042);
-  gr.addColorStop(0, '#d8d8d8'); gr.addColorStop(1, '#3a3a40');
-  g.fillStyle = gr; g.fill();
 
-  // Pomello a sfera rosso
-  circle(kx, ky, br);
-  gr = g.createRadialGradient(kx - br * 0.35, ky - br * 0.4, br * 0.05, kx, ky, br * 1.05);
-  gr.addColorStop(0, '#ffb0b0'); gr.addColorStop(0.22, '#ff3030'); gr.addColorStop(0.7, '#c00000'); gr.addColorStop(1, '#450000');
-  g.fillStyle = gr; g.fill();
-  g.lineWidth = S * 0.006; g.strokeStyle = 'rgba(0,0,0,.45)'; g.stroke();
+  // Da qui si disegna nel riferimento della cloche: asse verso l'alto (y negativa), lungo len.
   g.save();
-  g.translate(kx - br * 0.38, ky - br * 0.46); g.rotate(-0.6);
-  g.beginPath(); g.ellipse(0, 0, br * 0.3, br * 0.17, 0, 0, Math.PI * 2);
-  g.fillStyle = 'rgba(255,255,255,.75)'; g.fill();
+  g.translate(px, py); g.rotate(ang);
+  const u = len, y0 = -0.3 * u, y1 = -0.84 * u, lerp = (p, q, k) => p + (q - p) * k;
+
+  // Asta metallica fra la cuffia e l'impugnatura
+  const sw = Z * 0.03;
+  gr = g.createLinearGradient(-sw, 0, sw, 0);
+  gr.addColorStop(0, '#3a3a40'); gr.addColorStop(0.35, '#d0d0d4'); gr.addColorStop(1, '#2a2a2e');
+  g.fillStyle = gr; g.fillRect(-sw, -0.2 * u, sw * 2, -0.12 * u);
+
+  // Impugnatura ergonomica, più gonfia sul lato del palmo (destra)
+  const wB = Z * 0.055, wT = Z * 0.068;
+  g.beginPath();
+  g.moveTo(-wB, y0);
+  g.bezierCurveTo(-wB * 1.15, lerp(y0, y1, 0.4), -wT * 1.05, lerp(y0, y1, 0.75), -wT, y1);
+  g.lineTo(wT, y1);
+  g.bezierCurveTo(wT * 1.3, lerp(y0, y1, 0.7), wB * 1.4, lerp(y0, y1, 0.35), wB, y0);
+  g.quadraticCurveTo(0, y0 + Z * 0.025, -wB, y0);
+  g.closePath();
+  gr = g.createLinearGradient(-wT, 0, wT * 1.3, 0);
+  gr.addColorStop(0, '#55585f'); gr.addColorStop(0.3, '#2c2e33'); gr.addColorStop(0.75, '#131417'); gr.addColorStop(1, '#070708');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.8)'; g.lineWidth = Z * 0.006; g.stroke();
+  // Scanalature di gomma
+  g.save(); g.clip();
+  for (let k = 0; k < 6; k++) {
+    const yy = lerp(y0, y1, 0.14 + k * 0.13);
+    g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = Z * 0.007;
+    g.beginPath(); g.moveTo(-wT * 1.4, yy); g.lineTo(wT * 1.4, yy); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = Z * 0.004;
+    g.beginPath(); g.moveTo(-wT * 1.4, yy + Z * 0.007); g.lineTo(wT * 1.4, yy + Z * 0.007); g.stroke();
+  }
+  g.restore();
+  // Levetta del mignolo sul lato destro
+  g.beginPath(); g.roundRect(wB * 1.15, lerp(y0, y1, 0.22), Z * 0.03, Z * 0.055, Z * 0.012);
+  g.fillStyle = '#1e1f23'; g.fill(); g.strokeStyle = '#000'; g.lineWidth = Z * 0.005; g.stroke();
+
+  // Testa: più la cloche viene verso chi guarda, più se ne vede la faccia superiore
+  const hrx = Z * 0.085, hry = Z * (0.045 + 0.05 * Math.max(0, 1 - len / (L * Math.cos(EYE)))), hy = y1 - hry * 0.55;
+  g.beginPath(); g.ellipse(0, hy, hrx, hry, 0, 0, Math.PI * 2);
+  gr = g.createLinearGradient(-hrx, hy - hry, hrx, hy + hry);
+  gr.addColorStop(0, '#4b4e55'); gr.addColorStop(0.5, '#25272b'); gr.addColorStop(1, '#0c0c0e');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineWidth = Z * 0.006; g.stroke();
+
+  // Pulsante rosso di sgancio con il suo anello di protezione
+  const rbx = -hrx * 0.38, rby = hy - hry * 0.15, rbr = Z * 0.022;
+  circle(rbx, rby, rbr * 1.45); g.fillStyle = '#0b0b0d'; g.fill();
+  circle(rbx, rby, rbr);
+  gr = g.createRadialGradient(rbx - rbr * 0.35, rby - rbr * 0.4, rbr * 0.1, rbx, rby, rbr);
+  gr.addColorStop(0, '#ffb3b3'); gr.addColorStop(0.35, '#ff2a2a'); gr.addColorStop(1, '#6a0000');
+  g.fillStyle = gr; g.fill();
+
+  // Hat switch a quattro vie
+  const hx = hrx * 0.42, hhy = hy - hry * 0.2, hr = Z * 0.021;
+  circle(hx, hhy, hr);
+  gr = g.createRadialGradient(hx - hr * 0.3, hhy - hr * 0.3, 0, hx, hhy, hr);
+  gr.addColorStop(0, '#9a9ea6'); gr.addColorStop(1, '#2a2c30');
+  g.fillStyle = gr; g.fill();
+  g.strokeStyle = '#111'; g.lineWidth = Z * 0.006;
+  g.beginPath(); g.moveTo(hx - hr * 0.6, hhy); g.lineTo(hx + hr * 0.6, hhy); g.moveTo(hx, hhy - hr * 0.6); g.lineTo(hx, hhy + hr * 0.6); g.stroke();
+
+  // Tastino centrale
+  circle(0, hy + hry * 0.45, Z * 0.011);
+  g.fillStyle = '#0a0a0b'; g.fill(); g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = Z * 0.004; g.stroke();
   g.restore();
 }
 
