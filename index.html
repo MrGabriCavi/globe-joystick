@@ -82,6 +82,8 @@
   .pill:hover { border-color: var(--amber); color: var(--amber); }
   .overhead-btn { pointer-events: auto; color: #4fe3ff; border-color: #22505a; }
   .iss-btn { pointer-events: auto; color: var(--green); border-color: #1f5a35; }
+  .records { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .rec-btn { pointer-events: auto; font-size: 7px; padding: 7px 9px; color: var(--amber); border-color: #4a3a12; }
   .card-list { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
   .card-list p { margin: 0 0 4px; font: 13px/1.45 system-ui, sans-serif; color: #c9c7c0; }
   .card-list .pill { align-self: flex-start; }
@@ -119,6 +121,16 @@
     content: 'PLAYER 1'; position: absolute; left: 22px; top: 10px;
     font-size: 6px; color: #4a4a55; letter-spacing: 1px;
   }
+
+  /* Bandierina della lingua, in alto a destra nel pannello: mostra la lingua in cui si passa */
+  .lang-btn {
+    position: absolute; top: 9px; right: 20px; width: 24px; height: 16px; padding: 0;
+    border: 1px solid #3a3a44; border-radius: 3px; overflow: hidden; cursor: pointer;
+    background: #111; opacity: .8; transition: opacity .1s, transform .1s;
+  }
+  .lang-btn:hover, .lang-btn:focus-visible { opacity: 1; transform: scale(1.12); }
+  .lang-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  .lang-btn svg { display: block; width: 100%; height: 100%; }
 
   #stick { width: var(--stick); height: var(--stick); display: block; touch-action: none; cursor: grab; }
   #stick.grabbing { cursor: grabbing; }
@@ -191,32 +203,39 @@
   <div class="coords" id="coords">LAT --  LON --</div>
   <div class="status" id="status">CARICAMENTO…</div>
   <div class="satbar">
-    <select id="group" aria-label="Gruppo di satelliti"></select>
-    <button class="pill overhead-btn" id="btnOverhead">◎ SOPRA DI ME</button>
-    <button class="pill iss-btn" id="btnIss">✦ VAI A ISS</button>
+    <select id="group" data-i18n-aria="groupAria" aria-label="Gruppo di satelliti"></select>
+    <button class="pill overhead-btn" id="btnOverhead" data-i18n="aboveMe">◎ SOPRA DI ME</button>
+    <button class="pill iss-btn" id="btnIss" data-i18n="goIss">✦ VAI A ISS</button>
     <div class="satinfo" id="satinfo"></div>
   </div>
+  <div class="records">
+    <button class="pill rec-btn" data-record="fastest" data-i18n="recFastest" data-i18n-title="recFastestTitle">» IL PIÙ VELOCE</button>
+    <button class="pill rec-btn" data-record="slowest" data-i18n="recSlowest" data-i18n-title="recSlowestTitle">« IL PIÙ LENTO</button>
+    <button class="pill rec-btn" data-record="farthest" data-i18n="recFarthest" data-i18n-title="recFarthestTitle">↑ IL PIÙ LONTANO</button>
+    <button class="pill rec-btn" data-record="closest" data-i18n="recClosest" data-i18n-title="recClosestTitle">↓ IL PIÙ VICINO</button>
+  </div>
 </header>
-<p class="hint">Trascina la leva · Frecce o WASD<br>Rotella o pinch per lo zoom<br>Clic su un satellite per la scheda</p>
+<p class="hint" data-i18n-html="hint">Trascina la leva · Frecce o WASD<br>Rotella o pinch per lo zoom<br>Clic su un satellite per la scheda</p>
 
 <aside class="card" id="card" hidden>
-  <button class="card-close" id="cardClose" aria-label="Chiudi">✕</button>
+  <button class="card-close" id="cardClose" data-i18n-aria="close" aria-label="Chiudi">✕</button>
   <div class="card-title" id="cardTitle"></div>
   <div class="card-sub" id="cardSub"></div>
   <img class="card-img" id="cardImg" alt="" hidden>
-  <a class="card-credit" id="cardImgCredit" target="_blank" rel="noopener" hidden>Foto: Wikimedia Commons · autore e licenza ↗</a>
+  <a class="card-credit" id="cardImgCredit" target="_blank" rel="noopener" hidden data-i18n="photoCredit">Foto: Wikimedia Commons · autore e licenza ↗</a>
   <p class="card-desc" id="cardDesc" hidden></p>
   <dl class="card-grid" id="cardLive"></dl>
   <dl class="card-grid" id="cardInfo"></dl>
   <div class="card-list" id="cardList" hidden></div>
   <div class="card-actions">
-    <button class="pill" id="cardCenter">CENTRA</button>
+    <button class="pill" id="cardCenter" data-i18n="center">CENTRA</button>
     <a class="pill" id="cardN2yo" target="_blank" rel="noopener">N2YO ↗</a>
     <a class="pill" id="cardWiki" target="_blank" rel="noopener" hidden>WIKI ↗</a>
   </div>
 </aside>
 
 <section class="deck" id="deck">
+  <button class="lang-btn" id="btnLang"></button>
   <div class="readout">
     <div class="leds" id="leds">
       <span>↖</span><span>↑</span><span>↗</span>
@@ -226,10 +245,10 @@
     <div class="vals"><div id="valX">X +0.00</div><div id="valY">Y +0.00</div></div>
     <div class="power"><div id="powerBar"></div></div>
   </div>
-  <canvas id="stick" role="application" aria-label="Joystick: trascina o usa le frecce"></canvas>
+  <canvas id="stick" role="application" data-i18n-aria="stickAria" aria-label="Joystick: trascina o usa le frecce"></canvas>
   <div class="buttons">
-    <div class="btn"><button class="arcade" id="btnReset" aria-label="Torna a Roma"></button>RESET</div>
-    <div class="btn"><button class="arcade yellow" id="btnMode" aria-label="Cambia modalità"></button><span id="modeLabel">VOLA</span></div>
+    <div class="btn"><button class="arcade" id="btnReset" data-i18n-aria="resetAria" aria-label="Torna a Roma"></button>RESET</div>
+    <div class="btn"><button class="arcade yellow" id="btnMode" data-i18n-aria="modeAria" aria-label="Cambia modalità"></button><span id="modeLabel">VOLA</span></div>
   </div>
 </section>
 
@@ -239,7 +258,78 @@ import * as sat from 'satellite.js';
 
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
-const setStatus = (msg) => { $('status').textContent = msg; };
+/* =========================================================================
+   Lingua: italiano e inglese. La scelta resta nel browser; la prima volta
+   segue la lingua del browser. Testi fissi della pagina con data-i18n*.
+   ========================================================================= */
+const STR = {
+  it: {
+    loading: 'CARICAMENTO…', webglUnavailable: 'WEBGL NON DISPONIBILE', textureOffline: 'TEXTURE OFFLINE',
+    issUnavailable: 'ISS NON DISPONIBILE',
+    groupAria: 'Gruppo di satelliti', aboveMe: '◎ SOPRA DI ME', goIss: '✦ VAI A ISS',
+    recFastest: '» IL PIÙ VELOCE', recSlowest: '« IL PIÙ LENTO', recFarthest: '↑ IL PIÙ LONTANO', recClosest: '↓ IL PIÙ VICINO',
+    recFastestTitle: 'Il satellite più veloce del gruppo', recSlowestTitle: 'Il satellite più lento del gruppo',
+    recFarthestTitle: 'Il satellite del gruppo più lontano dalla Terra', recClosestTitle: 'Il satellite del gruppo più vicino alla Terra',
+    hint: 'Trascina la leva · Frecce o WASD<br>Rotella o pinch per lo zoom<br>Clic su un satellite per la scheda',
+    close: 'Chiudi', photoCredit: 'Foto: Wikimedia Commons · autore e licenza ↗', center: 'CENTRA',
+    stickAria: 'Joystick: trascina o usa le frecce', resetAria: 'Torna a Roma', modeAria: 'Cambia modalità',
+    modeFly: 'VOLA', modeDrag: 'RUOTA', langSwitch: 'English',
+    satLive: (n) => `${n} SAT · IN DIRETTA`, satUpdated: (n, at, left) => `${n} SAT · AGG ${at} · ⟳ ${left}`,
+    satLoading: 'CARICO SATELLITI…', dataUnavailable: 'DATI NON DISPONIBILI',
+    altitude: 'Quota', speed: 'Velocità', position: 'Posizione', inclination: 'Inclinazione', period: 'Periodo',
+    apsides: 'Apogeo / perigeo', orbitalData: 'Dati orbitali', ageHours: (h) => `di ${h} h fa`, ageDays: (d) => `di ${d} giorni fa`,
+    positionAt: 'Posizione al', now: 'adesso', status: 'Stato', notComputable: 'posizione non calcolabile',
+    catalog: 'Catalogo', catalogLoading: 'carico…', catalogUnavailable: 'non disponibile',
+    type: 'Tipo', owner: 'Proprietario', launch: 'Lancio', launchSite: 'Base di lancio', decay: 'Rientro',
+    compass: ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'],
+    aboveYou: 'SOPRA DI TE', ovLocating: 'Cerco la tua posizione…', ovUseApprox: 'USA POSIZIONE APPROSSIMATIVA',
+    ovAskingApprox: 'Chiedo una posizione approssimativa alla rete…', ovApproxFail: 'Posizione approssimativa non disponibile.',
+    ovOfferApprox: 'Posso usare una posizione approssimativa ricavata dalla connessione (di solito la città).',
+    ovPreciseFail: (why) => `Posizione precisa non disponibile: ${why}.`,
+    geoHttps: 'il browser la concede solo alle pagine https o al file aperto dal PC',
+    geoDenied: 'permesso negato', geoTimeout: 'tempo scaduto', geoUnavailable: 'non disponibile',
+    fromNetwork: 'dalla rete', positionsAt: (at) => `posizioni delle ${at}`,
+    ovSome: (n, g, min, when) => `${n} satelliti del gruppo «${g}» sono più alti di ${min}° sull'orizzonte (${when}). Tocca un nome per la scheda.`,
+    ovNone: (g, min) => `Nessun satellite del gruppo «${g}» è più alto di ${min}° sull'orizzonte adesso. Prova un altro gruppo, per esempio Starlink.`,
+  },
+  en: {
+    loading: 'LOADING…', webglUnavailable: 'WEBGL UNAVAILABLE', textureOffline: 'TEXTURE OFFLINE',
+    issUnavailable: 'ISS UNAVAILABLE',
+    groupAria: 'Satellite group', aboveMe: '◎ ABOVE ME', goIss: '✦ GO TO ISS',
+    recFastest: '» FASTEST', recSlowest: '« SLOWEST', recFarthest: '↑ FARTHEST', recClosest: '↓ CLOSEST',
+    recFastestTitle: 'The fastest satellite in the group', recSlowestTitle: 'The slowest satellite in the group',
+    recFarthestTitle: 'The satellite in the group farthest from Earth', recClosestTitle: 'The satellite in the group closest to Earth',
+    hint: 'Drag the stick · Arrows or WASD<br>Wheel or pinch to zoom<br>Click a satellite for details',
+    close: 'Close', photoCredit: 'Photo: Wikimedia Commons · author and license ↗', center: 'CENTER',
+    stickAria: 'Joystick: drag or use the arrow keys', resetAria: 'Back to Rome', modeAria: 'Switch mode',
+    modeFly: 'FLY', modeDrag: 'ROTATE', langSwitch: 'Italiano',
+    satLive: (n) => `${n} SAT · LIVE`, satUpdated: (n, at, left) => `${n} SAT · UPD ${at} · ⟳ ${left}`,
+    satLoading: 'LOADING SATELLITES…', dataUnavailable: 'DATA UNAVAILABLE',
+    altitude: 'Altitude', speed: 'Speed', position: 'Position', inclination: 'Inclination', period: 'Period',
+    apsides: 'Apogee / perigee', orbitalData: 'Orbital data', ageHours: (h) => `${h} h old`, ageDays: (d) => `${d} days old`,
+    positionAt: 'Position at', now: 'now', status: 'Status', notComputable: 'position not computable',
+    catalog: 'Catalog', catalogLoading: 'loading…', catalogUnavailable: 'unavailable',
+    type: 'Type', owner: 'Owner', launch: 'Launch', launchSite: 'Launch site', decay: 'Reentry',
+    compass: ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'],
+    aboveYou: 'ABOVE YOU', ovLocating: 'Finding your location…', ovUseApprox: 'USE APPROXIMATE LOCATION',
+    ovAskingApprox: 'Asking the network for an approximate location…', ovApproxFail: 'Approximate location unavailable.',
+    ovOfferApprox: 'I can use an approximate location based on your connection (usually the city).',
+    ovPreciseFail: (why) => `Precise location unavailable: ${why}.`,
+    geoHttps: 'browsers only allow it on https pages or local files',
+    geoDenied: 'permission denied', geoTimeout: 'timed out', geoUnavailable: 'unavailable',
+    fromNetwork: 'from the network', positionsAt: (at) => `positions at ${at}`,
+    ovSome: (n, g, min, when) => `${n} satellites in «${g}» are more than ${min}° above the horizon (${when}). Tap a name for details.`,
+    ovNone: (g, min) => `No satellite in «${g}» is more than ${min}° above the horizon right now. Try another group, for example Starlink.`,
+  },
+};
+let lang = 'it';
+try { lang = localStorage.getItem('lang') || ''; } catch { /* storage non disponibile */ }
+if (!STR[lang]) lang = (navigator.language || '').toLowerCase().startsWith('it') ? 'it' : 'en';
+const t = (key, ...args) => { const v = STR[lang][key]; return typeof v === 'function' ? v(...args) : v ?? key; };
+const locale = () => (lang === 'it' ? 'it-IT' : 'en-GB');
+const loc = (v) => (v && typeof v === 'object' ? v[lang] : v);   // { it, en }, oppure testo uguale nelle due lingue
+let statusKey = 'loading';
+const setStatus = (key) => { statusKey = key; $('status').textContent = key ? t(key) : ''; };
 
 /* =========================================================================
    Scena 3D
@@ -248,7 +338,7 @@ let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ canvas: $('scene'), antialias: true });
 } catch (err) {
-  setStatus('WEBGL NON DISPONIBILE');
+  setStatus('webglUnavailable');
   throw err;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -328,7 +418,7 @@ loader.load(TEX + 'earth-blue-marble.jpg', (t) => {
   earthMat.map = fallbackTexture();
   earthMat.color.set(0xffffff);
   earthMat.needsUpdate = true;
-  setStatus('TEXTURE OFFLINE');
+  setStatus('textureOffline');
 });
 loader.load(TEX + 'earth-topology.png', (t) => {
   earthMat.bumpMap = t; earthMat.bumpScale = 3; earthMat.needsUpdate = true;
@@ -679,7 +769,7 @@ function resetView() {
 }
 function toggleMode() {
   view.mode = view.mode === 'fly' ? 'drag' : 'fly';
-  $('modeLabel').textContent = view.mode === 'fly' ? 'VOLA' : 'RUOTA';
+  $('modeLabel').textContent = t(view.mode === 'fly' ? 'modeFly' : 'modeDrag');
 }
 $('btnReset').addEventListener('click', resetView);
 $('btnMode').addEventListener('click', toggleMode);
@@ -693,12 +783,12 @@ $('btnMode').addEventListener('click', toggleMode);
    con cache nel browser.
    ========================================================================= */
 const GROUPS = {
-  visual: 'Più luminosi',
-  stations: 'Stazioni spaziali',
-  weather: 'Meteo',
+  visual: { it: 'Più luminosi', en: 'Brightest' },
+  stations: { it: 'Stazioni spaziali', en: 'Space stations' },
+  weather: { it: 'Meteo', en: 'Weather' },
   'gps-ops': 'GPS',
   galileo: 'Galileo',
-  geo: 'Geostazionari',
+  geo: { it: 'Geostazionari', en: 'Geostationary' },
   starlink: 'Starlink',
 };
 const POSITION_REFRESH_MS = 10 * 60 * 1000;
@@ -944,7 +1034,7 @@ async function loadGroup(group) {
     fitZoomToGroup();
   } catch (err) {
     console.error(err);
-    sats.error = 'DATI NON DISPONIBILI';
+    sats.error = 'dataUnavailable';
   }
   updateSatInfo();
 }
@@ -984,16 +1074,16 @@ async function tick() {
 }
 setInterval(tick, 1000);
 
-const hhmm = (t) => new Date(t).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+const hhmm = (ms) => new Date(ms).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
 function updateSatInfo() {
   let s;
-  if (sats.error) s = sats.error;
-  else if (!sats.list.length) s = 'CARICO SATELLITI…';
-  else if (isLive()) s = `${sats.list.filter((x) => x.ok).length} SAT · IN DIRETTA`;
+  if (sats.error) s = t(sats.error);
+  else if (!sats.list.length) s = t('satLoading');
+  else if (isLive()) s = t('satLive', sats.list.filter((x) => x.ok).length);
   else {
     const left = Math.max(0, POSITION_REFRESH_MS - (Date.now() - sats.refreshedAt)) / 1000;
     const mm = Math.floor(left / 60), ss = String(Math.floor(left % 60)).padStart(2, '0');
-    s = `${sats.list.filter((x) => x.ok).length} SAT · AGG ${hhmm(sats.refreshedAt)} · ⟳ ${mm}:${ss}`;
+    s = t('satUpdated', sats.list.filter((x) => x.ok).length, hhmm(sats.refreshedAt), `${mm}:${ss}`);
   }
   $('satinfo').textContent = s;
 }
@@ -1052,16 +1142,25 @@ const hud = document.querySelector('.hud');
 new ResizeObserver(() => {
   document.documentElement.style.setProperty('--hud-bottom', hud.getBoundingClientRect().bottom + 'px');
 }).observe(hud);
-const OBJECT_TYPE = { PAY: 'Satellite', 'R/B': 'Stadio di razzo', DEB: 'Detrito', UNK: 'Sconosciuto' };
+const OBJECT_TYPE = {
+  PAY: 'Satellite', 'R/B': { it: 'Stadio di razzo', en: 'Rocket body' }, DEB: { it: 'Detrito', en: 'Debris' },
+  UNK: { it: 'Sconosciuto', en: 'Unknown' },
+};
 const OPS_STATUS = {
-  '+': 'Operativo', '-': 'Non operativo', P: 'Parzialmente operativo', B: 'Riserva', S: 'Scorta',
-  X: 'Missione estesa', D: 'Rientrato', '?': 'Sconosciuto',
+  '+': { it: 'Operativo', en: 'Operational' }, '-': { it: 'Non operativo', en: 'Nonoperational' },
+  P: { it: 'Parzialmente operativo', en: 'Partially operational' }, B: { it: 'Riserva', en: 'Backup' },
+  S: { it: 'Scorta', en: 'Spare' }, X: { it: 'Missione estesa', en: 'Extended mission' },
+  D: { it: 'Rientrato', en: 'Decayed' }, '?': { it: 'Sconosciuto', en: 'Unknown' },
 };
 const OWNERS = {
-  US: 'Stati Uniti', PRC: 'Cina', CIS: 'Russia / ex URSS', ESA: 'ESA', JPN: 'Giappone', IND: 'India',
-  FR: 'Francia', UK: 'Regno Unito', GER: 'Germania', IT: 'Italia', ISS: 'ISS (internazionale)',
-  CA: 'Canada', SKOR: 'Corea del Sud', ISRA: 'Israele', BRAZ: 'Brasile', EUME: 'EUMETSAT',
-  EUTE: 'Eutelsat', ITSO: 'Intelsat', SES: 'SES', IRID: 'Iridium', GLOB: 'Globalstar', ORB: 'Orbcomm',
+  US: { it: 'Stati Uniti', en: 'United States' }, PRC: { it: 'Cina', en: 'China' },
+  CIS: { it: 'Russia / ex URSS', en: 'Russia / former USSR' }, ESA: 'ESA', JPN: { it: 'Giappone', en: 'Japan' },
+  IND: 'India', FR: { it: 'Francia', en: 'France' }, UK: { it: 'Regno Unito', en: 'United Kingdom' },
+  GER: { it: 'Germania', en: 'Germany' }, IT: { it: 'Italia', en: 'Italy' },
+  ISS: { it: 'ISS (internazionale)', en: 'ISS (international)' }, CA: 'Canada',
+  SKOR: { it: 'Corea del Sud', en: 'South Korea' }, ISRA: { it: 'Israele', en: 'Israel' },
+  BRAZ: { it: 'Brasile', en: 'Brazil' }, EUME: 'EUMETSAT', EUTE: 'Eutelsat', ITSO: 'Intelsat', SES: 'SES',
+  IRID: 'Iridium', GLOB: 'Globalstar', ORB: 'Orbcomm',
 };
 const SITES = {
   AFETR: 'Cape Canaveral', AFWTR: 'Vandenberg', TYMSC: 'Baikonur', PLMSC: 'Plesetsk', VOSTO: 'Vostochny',
@@ -1069,7 +1168,8 @@ const SITES = {
   SRILR: 'Sriharikota', TNSTA: 'Tanegashima', KSCUT: 'Uchinoura', WLPIS: 'Wallops', RLLB: 'Mahia (Rocket Lab)',
   SEAL: 'Sea Launch', YAVNE: 'Palmachim', NSC: 'Naro',
 };
-const fmt = (v, d = 0) => v.toLocaleString('it-IT', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmt = (v, d = 0) => v.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmtDate = (s) => new Date(s).toLocaleDateString(locale());
 
 // Con le stesse righe aggiorna solo i testi cambiati: con l'aggiornamento ogni secondo
 // non si perde il testo selezionato nella schedina.
@@ -1094,15 +1194,15 @@ function renderCardLive() {
   const r = s.satrec, n = r.no / 60, a = Math.cbrt(MU / (n * n));
   const ageH = (sats.positionsAt - s.epoch) / 3600000;
   renderRows($('cardLive'), s.ok ? [
-    ['Quota', fmt(s.alt) + ' km'],
-    ['Velocità', fmt(s.speed, 2) + ' km/s'],
-    ['Posizione', `${fmt(Math.abs(s.lat), 1)}°${s.lat >= 0 ? 'N' : 'S'} ${fmt(Math.abs(s.lon), 1)}°${s.lon >= 0 ? 'E' : 'W'}`],
-    ['Inclinazione', fmt(r.inclo / DEG, 1) + '°'],
-    ['Periodo', fmt(2 * Math.PI / r.no, 1) + ' min'],
-    ['Apogeo / perigeo', `${fmt(a * (1 + r.ecco) - R_EQ)} / ${fmt(a * (1 - r.ecco) - R_EQ)} km`],
-    ['Dati orbitali', ageH < 48 ? `di ${fmt(ageH)} h fa` : `di ${fmt(ageH / 24)} giorni fa`],
-    ['Posizione al', isLive() ? 'adesso' : hhmm(sats.positionsAt)],
-  ] : [['Stato', 'posizione non calcolabile']]);
+    [t('altitude'), fmt(s.alt) + ' km'],
+    [t('speed'), fmt(s.speed, 2) + ' km/s'],
+    [t('position'), `${fmt(Math.abs(s.lat), 1)}°${s.lat >= 0 ? 'N' : 'S'} ${fmt(Math.abs(s.lon), 1)}°${s.lon >= 0 ? 'E' : 'W'}`],
+    [t('inclination'), fmt(r.inclo / DEG, 1) + '°'],
+    [t('period'), fmt(2 * Math.PI / r.no, 1) + ' min'],
+    [t('apsides'), `${fmt(a * (1 + r.ecco) - R_EQ)} / ${fmt(a * (1 - r.ecco) - R_EQ)} km`],
+    [t('orbitalData'), ageH < 48 ? t('ageHours', fmt(ageH)) : t('ageDays', fmt(ageH / 24))],
+    [t('positionAt'), isLive() ? t('now') : hhmm(sats.positionsAt)],
+  ] : [[t('status'), t('notComputable')]]);
 }
 // La schedina ha due modalità: 'sat' (un satellite) e 'overhead' (elenco "sopra di me").
 function setCardMode(mode) {
@@ -1120,7 +1220,7 @@ function openCard(s) {
   $('cardN2yo').href = `https://www.n2yo.com/satellite/?s=${s.id}`;
   $('cardImg').removeAttribute('src');
   renderCardLive();
-  renderRows($('cardInfo'), [['Catalogo', 'carico…']]);
+  renderRows($('cardInfo'), [[t('catalog'), t('catalogLoading')]]);
   loadDetails(s);
 }
 function closeCard() { card.hidden = true; }
@@ -1139,16 +1239,18 @@ function getSatcat(id) {
   }
   return satcatCache.get(id);
 }
+// Descrizione e voce di Wikipedia nella lingua scelta (con l'altra come riserva per le etichette).
 function getWiki(id) {
-  if (!wikiCache.has(id)) {
+  const key = lang + ':' + id;
+  if (!wikiCache.has(key)) {
     // Più voci possono condividere il numero NORAD (es. ISS e il modulo Zarja): vince la più citata.
     const q = `SELECT ?item ?itemLabel ?itemDescription ?image ?article WHERE {
       ?item wdt:P377 "${id}"; wikibase:sitelinks ?links.
       OPTIONAL { ?item wdt:P18 ?image }
-      OPTIONAL { ?article schema:about ?item; schema:isPartOf <https://it.wikipedia.org/> }
-      SERVICE wikibase:label { bd:serviceParam wikibase:language "it,en". }
+      OPTIONAL { ?article schema:about ?item; schema:isPartOf <https://${lang}.wikipedia.org/> }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "${lang === 'it' ? 'it,en' : 'en,it'}". }
     } ORDER BY DESC(?links) LIMIT 1`;
-    wikiCache.set(id, fetch('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q))
+    wikiCache.set(key, fetch('https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(q))
       .then((r) => r.json()).then((j) => {
         const b = j.results.bindings[0];
         if (!b) return null;
@@ -1159,19 +1261,20 @@ function getWiki(id) {
         };
       }).catch(() => null));
   }
-  return wikiCache.get(id);
+  return wikiCache.get(key);
 }
 async function loadDetails(s) {
+  const l = lang;
   const [cat, wiki] = await Promise.all([getSatcat(s.id), getWiki(s.id)]);
-  if (sats.selected !== s || card.dataset.mode !== 'sat') return;
+  if (sats.selected !== s || card.dataset.mode !== 'sat' || lang !== l) return;   // nel frattempo è cambiato qualcosa
   renderRows($('cardInfo'), cat ? [
-    ['Tipo', OBJECT_TYPE[cat.OBJECT_TYPE] || cat.OBJECT_TYPE || '—'],
-    ['Stato', OPS_STATUS[cat.OPS_STATUS_CODE] || '—'],
-    ['Proprietario', OWNERS[cat.OWNER] || cat.OWNER || '—'],
-    ['Lancio', cat.LAUNCH_DATE ? new Date(cat.LAUNCH_DATE).toLocaleDateString('it-IT') : '—'],
-    ['Base di lancio', SITES[cat.LAUNCH_SITE] || cat.LAUNCH_SITE || '—'],
-    ...(cat.DECAY_DATE ? [['Rientro', new Date(cat.DECAY_DATE).toLocaleDateString('it-IT')]] : []),
-  ] : [['Catalogo', 'non disponibile']]);
+    [t('type'), loc(OBJECT_TYPE[cat.OBJECT_TYPE]) || cat.OBJECT_TYPE || '—'],
+    [t('status'), loc(OPS_STATUS[cat.OPS_STATUS_CODE]) || '—'],
+    [t('owner'), loc(OWNERS[cat.OWNER]) || cat.OWNER || '—'],
+    [t('launch'), cat.LAUNCH_DATE ? fmtDate(cat.LAUNCH_DATE) : '—'],
+    [t('launchSite'), SITES[cat.LAUNCH_SITE] || cat.LAUNCH_SITE || '—'],
+    ...(cat.DECAY_DATE ? [[t('decay'), fmtDate(cat.DECAY_DATE)]] : []),
+  ] : [[t('catalog'), t('catalogUnavailable')]]);
   if (wiki) {
     const desc = [wiki.label !== s.name ? wiki.label : '', wiki.description].filter(Boolean).join(' — ');
     $('cardDesc').textContent = desc;
@@ -1193,18 +1296,17 @@ async function loadDetails(s) {
    Posizione precisa dal browser (serve https, oppure il file aperto dal PC);
    se non c'è, su richiesta una posizione approssimativa dall'indirizzo IP. */
 const MIN_ELEVATION = 10;   // gradi sopra l'orizzonte
-const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 let observerMarker = null;
 
 function preciseLocation() {
   return new Promise((resolve, reject) => {
     if (!window.isSecureContext || !navigator.geolocation) {
-      reject(new Error('il browser la concede solo alle pagine https o al file aperto dal PC'));
+      reject(new Error('geoHttps'));   // i messaggi sono chiavi dei testi tradotti
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, source: 'GPS', accuracy: p.coords.accuracy }),
-      (err) => reject(new Error(err.code === 1 ? 'permesso negato' : err.code === 3 ? 'tempo scaduto' : 'non disponibile')),
+      (err) => reject(new Error(err.code === 1 ? 'geoDenied' : err.code === 3 ? 'geoTimeout' : 'geoUnavailable')),
       { timeout: 15000, maximumAge: 10 * 60 * 1000 },
     );
   });
@@ -1231,23 +1333,26 @@ function updateOverhead() {
 }
 
 const para = (text) => { const el = document.createElement('p'); el.textContent = text; return el; };
-function renderOverheadCard(message, offerApprox) {
+// msgKey/detailKey sono chiavi dei testi: al cambio di lingua la schedina si ridisegna uguale.
+let overheadArgs = [];
+function renderOverheadCard(msgKey, offerApprox, detailKey) {
+  overheadArgs = [msgKey, offerApprox, detailKey];
   setCardMode('overhead');
   const o = sats.observer, list = $('cardList');
-  $('cardTitle').textContent = 'SOPRA DI TE';
+  $('cardTitle').textContent = t('aboveYou');
   delete list.dataset.ids;
   if (!o) {
     $('cardSub').textContent = '';
-    list.replaceChildren(para(message || 'Cerco la tua posizione…'));
+    list.replaceChildren(para(t(msgKey || 'ovLocating', detailKey && t(detailKey))));
     if (offerApprox) {
       const b = document.createElement('button');
       b.className = 'pill';
-      b.textContent = 'USA POSIZIONE APPROSSIMATIVA';
+      b.textContent = t('ovUseApprox');
       b.addEventListener('click', async () => {
-        renderOverheadCard('Chiedo una posizione approssimativa alla rete…');
-        try { setObserver(await approxLocation()); } catch { renderOverheadCard('Posizione approssimativa non disponibile.'); }
+        renderOverheadCard('ovAskingApprox');
+        try { setObserver(await approxLocation()); } catch { renderOverheadCard('ovApproxFail'); }
       });
-      list.append(para('Posso usare una posizione approssimativa ricavata dalla connessione (di solito la città).'), b);
+      list.append(para(t('ovOfferApprox')), b);
     }
     return;
   }
@@ -1260,7 +1365,7 @@ function renderOverheadList() {
   const o = sats.observer, list = $('cardList');
   if (!o) return;
   const where = `${fmt(Math.abs(o.lat), 2)}°${o.lat >= 0 ? 'N' : 'S'} ${fmt(Math.abs(o.lon), 2)}°${o.lon >= 0 ? 'E' : 'W'}`;
-  const how = o.source === 'GPS' ? `GPS ±${fmt(o.accuracy)} m` : `dalla rete${o.city ? ' · ' + o.city : ''}`;
+  const how = o.source === 'GPS' ? `GPS ±${fmt(o.accuracy)} m` : t('fromNetwork') + (o.city ? ' · ' + o.city : '');
   $('cardSub').textContent = `${where} · ${how}`;
   const ids = sats.overhead.map(({ s }) => s.id).join();
   if (list.dataset.ids !== ids) {
@@ -1279,13 +1384,15 @@ function renderOverheadList() {
       return b;
     }));
   }
-  const when = isLive() ? 'adesso' : `posizioni delle ${hhmm(sats.positionsAt)}`;
+  const when = isLive() ? t('now') : t('positionsAt', hhmm(sats.positionsAt));
+  const group = loc(GROUPS[sats.group]);
   overheadHead.textContent = sats.overhead.length
-    ? `${sats.overhead.length} satelliti del gruppo «${GROUPS[sats.group]}» sono più alti di ${MIN_ELEVATION}° sull'orizzonte (${when}). Tocca un nome per la scheda.`
-    : `Nessun satellite del gruppo «${GROUPS[sats.group]}» è più alto di ${MIN_ELEVATION}° sull'orizzonte adesso. Prova un altro gruppo, per esempio Starlink.`;
+    ? t('ovSome', sats.overhead.length, group, MIN_ELEVATION, when)
+    : t('ovNone', group, MIN_ELEVATION);
+  const compass = t('compass');
   sats.overhead.forEach(({ el, az, range }, i) => {
-    const t = `${fmt(el)}° ${COMPASS[Math.round(az / 45) % 8]} · ${fmt(range)} km`;
-    if (overheadInfo[i].textContent !== t) overheadInfo[i].textContent = t;
+    const txt = `${fmt(el)}° ${compass[Math.round(az / 45) % 8]} · ${fmt(range)} km`;
+    if (overheadInfo[i].textContent !== txt) overheadInfo[i].textContent = txt;
   });
 }
 
@@ -1308,9 +1415,17 @@ $('btnOverhead').addEventListener('click', async () => {
   try {
     setObserver(await preciseLocation());
   } catch (err) {
-    renderOverheadCard(`Posizione precisa non disponibile: ${err.message}.`, true);
+    renderOverheadCard('ovPreciseFail', true, STR[lang][err.message] ? err.message : 'geoUnavailable');
   }
 });
+
+// Seleziona un satellite e ci porta sopra il globo, allargando la vista se l'orbita è alta.
+function flyTo(s) {
+  selectSat(s);
+  view.homing = geoToView(s.lat, s.lon);
+  const r = s.pos.length();
+  view.zoomTarget = r > 1.6 ? Math.max(0.12, 0.85 / r) : 1.4;
+}
 
 /* ---------- Vai alla ISS ----------
    Se nel gruppo scelto non c'è, passa alle stazioni spaziali. */
@@ -1322,23 +1437,70 @@ async function goToIss() {
     await loadGroup('stations');
     iss = sats.list.find((s) => s.id === ISS_ID);
   }
-  if (!iss || !iss.ok) { setStatus('ISS NON DISPONIBILE'); return; }
-  selectSat(iss);
-  view.homing = geoToView(iss.lat, iss.lon);
-  view.zoomTarget = 1.4;
+  if (!iss || !iss.ok) { setStatus('issUnavailable'); return; }
+  flyTo(iss);
 }
 $('btnIss').addEventListener('click', goToIss);
+
+/* ---------- Record del gruppo: il più veloce, il più lento, il più lontano e il più vicino ---------- */
+const RECORDS = {
+  fastest: (s) => s.speed, slowest: (s) => -s.speed,
+  farthest: (s) => s.alt, closest: (s) => -s.alt,
+};
+function goToRecord(kind) {
+  const score = RECORDS[kind];
+  let best = null;
+  for (const s of sats.list) if (s.ok && (!best || score(s) > score(best))) best = s;
+  if (best) flyTo(best);
+}
+for (const b of document.querySelectorAll('[data-record]')) {
+  b.addEventListener('click', () => goToRecord(b.dataset.record));
+}
 
 // Menu dei gruppi
 {
   const sel = $('group');
-  for (const [k, label] of Object.entries(GROUPS)) sel.add(new Option(label.toUpperCase(), k));
+  for (const k of Object.keys(GROUPS)) sel.add(new Option(k, k));
   let saved = null;
   try { saved = localStorage.getItem('group'); } catch { /* ok */ }
   sel.value = GROUPS[saved] ? saved : 'visual';
   sel.addEventListener('change', () => { sel.blur(); loadGroup(sel.value); });
   loadGroup(sel.value);
 }
+
+/* ---------- Cambio lingua ---------- */
+// Bandierine disegnate qui: le emoji delle bandiere su Windows diventano due lettere.
+const FLAGS = {
+  it: '<svg viewBox="0 0 3 2" preserveAspectRatio="none"><rect width="1" height="2" fill="#009246"/>'
+    + '<rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ce2b37"/></svg>',
+  en: '<svg viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice"><clipPath id="ukc"><path d="M30,15h30v15zv15h-30zh-30v-15zv-15h30z"/></clipPath>'
+    + '<path d="M0,0v30h60v-30z" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/>'
+    + '<path d="M0,0 60,30M60,0 0,30" clip-path="url(#ukc)" stroke="#c8102e" stroke-width="4"/>'
+    + '<path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#c8102e" stroke-width="6"/></svg>',
+};
+function applyLang() {
+  document.documentElement.lang = lang;
+  for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = t(el.dataset.i18n);
+  for (const el of document.querySelectorAll('[data-i18n-html]')) el.innerHTML = t(el.dataset.i18nHtml);
+  for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', t(el.dataset.i18nAria));
+  for (const el of document.querySelectorAll('[data-i18n-title]')) el.title = t(el.dataset.i18nTitle);
+  for (const o of $('group').options) o.textContent = loc(GROUPS[o.value]).toUpperCase();
+  const flag = $('btnLang');
+  flag.innerHTML = FLAGS[lang === 'it' ? 'en' : 'it'];   // la bandiera della lingua in cui si passa
+  flag.title = t('langSwitch');
+  flag.setAttribute('aria-label', t('langSwitch'));
+  $('modeLabel').textContent = t(view.mode === 'fly' ? 'modeFly' : 'modeDrag');
+  setStatus(statusKey);
+  updateSatInfo();
+  if (!card.hidden && card.dataset.mode === 'sat' && sats.selected) openCard(sats.selected);
+  else if (!card.hidden && card.dataset.mode === 'overhead') renderOverheadCard(...overheadArgs);
+}
+$('btnLang').addEventListener('click', () => {
+  lang = lang === 'it' ? 'en' : 'it';
+  try { localStorage.setItem('lang', lang); } catch { /* ok */ }
+  applyLang();
+});
+applyLang();
 
 /* =========================================================================
    Loop
