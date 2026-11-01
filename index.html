@@ -343,7 +343,7 @@ const STR = {
     ovSome: (n, g, min, when) => `${n} satelliti del gruppo «${g}» sono più alti di ${min}° sull'orizzonte (${when}). Tocca un nome per la scheda.`,
     ovNone: (g, min) => `Nessun satellite del gruppo «${g}» è più alto di ${min}° sull'orizzonte adesso. Prova un altro gruppo, per esempio Starlink.`,
     allTitle: 'TUTTI GLI OGGETTI · N2YO', allLoading: 'Chiedo a N2YO tutto quello che hai sopra la testa…',
-    allSome: (n, min, at) => `${n} oggetti sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}). Sul globo, da lontano, sono raggruppati: tocca un gruppo per avvicinarti, o un nome qui sotto per andarci.`,
+    allSome: (n, min, at) => `${n} oggetti sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}). Satelliti e stazioni sono icone singole; stadi di razzo e detriti, da lontano, sono raggruppati: tocca un gruppo per avvicinarti, o un nome qui sotto per andarci.`,
     allHidden: (n) => `Altri ${n} sono stadi di razzo e detriti: per vederli, arma l'interruttore MASTER ARM.`,
     armTitle: 'MASTER ARM: in SAFE solo satelliti e stazioni spaziali, in ARM anche stadi di razzo e detriti',
     allMore: (n) => `…e altri ${n}.`, allNone: 'N2YO non vede niente sopra di te adesso.',
@@ -379,7 +379,7 @@ const STR = {
     ovSome: (n, g, min, when) => `${n} satellites in «${g}» are more than ${min}° above the horizon (${when}). Tap a name for details.`,
     ovNone: (g, min) => `No satellite in «${g}» is more than ${min}° above the horizon right now. Try another group, for example Starlink.`,
     allTitle: 'EVERYTHING · N2YO', allLoading: 'Asking N2YO for everything above your head…',
-    allSome: (n, min, at) => `${n} objects are more than ${min}° above the horizon (positions at ${at}). From afar they are grouped on the globe: tap a group to zoom in, or a name below to go there.`,
+    allSome: (n, min, at) => `${n} objects are more than ${min}° above the horizon (positions at ${at}). Satellites and stations are single icons; rocket bodies and debris are grouped from afar: tap a group to zoom in, or a name below to go there.`,
     allHidden: (n) => `${n} more are rocket bodies and debris: flip the MASTER ARM switch to see them.`,
     armTitle: 'MASTER ARM: SAFE shows only satellites and space stations, ARM adds rocket bodies and debris',
     allMore: (n) => `…and ${n} more.`, allNone: 'N2YO sees nothing above you right now.',
@@ -1597,10 +1597,11 @@ const allAbove = { list: [], at: 0, state: 'idle' };   // state: idle, loading, 
 const allShown = () => allAbove.list.filter((x) => visibleKind(x.kind));
 
 /* Sul globo si disegnano su un canvas 2D sopra la scena: a ogni fotogramma le posizioni si
-   proiettano sullo schermo e si raggruppano per distanza: un oggetto entra nel primo cluster
-   entro CLUSTER_RADIUS px, altrimenti ne apre uno nuovo. Con lo zoom gli oggetti si allontanano
-   sullo schermo e i cluster si aprono negli oggetti singoli. L'elenco è sempre nello stesso
-   ordine, quindi i cluster restano stabili mentre il globo gira. */
+   proiettano sullo schermo. Satelliti e stazioni restano sempre singoli; stadi di razzo e
+   detriti si raggruppano per distanza: uno entra nel primo cluster entro CLUSTER_RADIUS px,
+   altrimenti ne apre uno nuovo. Con lo zoom si allontanano sullo schermo e i cluster si aprono.
+   L'elenco è sempre nello stesso ordine, quindi i cluster restano stabili mentre il globo gira. */
+const CLUSTERED = new Set(['rb', 'deb']);
 const KIND_ICON = { sat: [16, drawSatIcon, '#ffc23a'], station: [22, drawStationIcon, '#f2f4f8'],
   rb: [15, drawRocketIcon, '#ff8a1f'], deb: [12, drawDebrisIcon, '#a7aeb8'] };   // lato in px, disegno, colore
 const CLUSTER_RADIUS = 58;   // px
@@ -1628,7 +1629,7 @@ function drawObjects() {
   // Più si è vicini, più il raggio si stringe: allo zoom massimo restano quasi solo oggetti singoli.
   const R = CLUSTER_RADIUS * Math.min(1, 1.5 / view.zoom) ** 1.4;
   const m = satellitesLayer.matrixWorld, p = new THREE.Vector3();
-  const clusters = [], grid = new Map();   // grid: celle di lato R per cercare solo i cluster vicini
+  const clusters = [], singles = [], grid = new Map();   // grid: celle di lato R per cercare solo i cluster vicini
   // Niente oggetti sotto l'intestazione e il pannello comandi: coprirebbero testi e pulsanti.
   const covered = [document.querySelector('.hud'), deck].map((el) => el.getBoundingClientRect());
   const underUi = (x, y) => covered.some((r) => x > r.left - 8 && x < r.right + 8 && y > r.top - 8 && y < r.bottom + 8);
@@ -1639,6 +1640,7 @@ function drawObjects() {
     if (p.z > 1 || Math.abs(p.x) > 1.05 || Math.abs(p.y) > 1.05) continue;
     const x = (p.x + 1) / 2 * w, y = (1 - p.y) / 2 * h, gx = Math.floor(x / R), gy = Math.floor(y / R);
     if (underUi(x, y)) continue;
+    if (!CLUSTERED.has(it.kind)) { singles.push({ x, y, it }); continue; }
     let best = null, bestD = R;
     for (let i = -1; i <= 1; i++) {
       for (let j = -1; j <= 1; j++) {
@@ -1654,15 +1656,15 @@ function drawObjects() {
     if (!grid.has(key)) grid.set(key, []);
     grid.get(key).push(c);
   }
+  const drawSingle = (x, y, it) => {
+    const [size] = KIND_ICON[it.kind];
+    og.drawImage(objSprite(it.kind, dpr), x - size / 2, y - size / 2, size, size);
+    objHits.push({ x, y, r: size / 2 + 6, items: [it] });
+  };
   og.textAlign = 'center'; og.textBaseline = 'middle';
   for (const c of clusters) {
     const n = c.items.length, x = c.x / n, y = c.y / n;
-    if (n === 1) {
-      const [size] = KIND_ICON[c.items[0].kind];
-      og.drawImage(objSprite(c.items[0].kind, dpr), x - size / 2, y - size / 2, size, size);
-      objHits.push({ x, y, r: size / 2 + 6, items: c.items });
-      continue;
-    }
+    if (n === 1) { drawSingle(x, y, c.items[0]); continue; }
     // Cluster: anello del colore del tipo più numeroso e il numero degli oggetti
     const count = {};
     for (const it of c.items) count[it.kind] = (count[it.kind] || 0) + 1;
@@ -1675,6 +1677,7 @@ function drawObjects() {
     og.fillText(String(n), x, y + 1);
     objHits.push({ x, y, r: r + 4, items: c.items });
   }
+  for (const { x, y, it } of singles) drawSingle(x, y, it);   // sopra i cluster
   // Nome dell'oggetto toccato, per qualche secondo
   if (objLabel && performance.now() < objLabel.until) {
     const hit = objHits.find((o) => o.items.length === 1 && o.items[0] === objLabel.it);
