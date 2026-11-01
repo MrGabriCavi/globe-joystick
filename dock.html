@@ -214,6 +214,7 @@
   <div class="title">DOCK<span>·</span>ISS</div>
   <div class="sub" id="issInfo"></div>
   <a class="back" href="index.html" data-i18n="back">← GLOBO</a>
+  <a class="back" href="about.html" data-i18n="info">INFO</a>
 </header>
 
 <!-- Sfumature degli strumenti del cruscotto -->
@@ -319,7 +320,7 @@ const $ = (id) => document.getElementById(id);
 // ---------------------------------------------------------------- lingua
 const STR = {
   it: {
-    back: '← GLOBO', start: '▶ INIZIA', retry: '↻ RIPROVA', levelsBtn: 'LIVELLI', startTitle: 'ATTRACCO ALLA ISS',
+    back: '← GLOBO', info: 'INFO', start: '▶ INIZIA', retry: '↻ RIPROVA', levelsBtn: 'LIVELLI', startTitle: 'ATTRACCO ALLA ISS',
     startText: 'La stazione gira attorno all\'asse del portello. Fai ruotare la navetta alla stessa velocità con i pulsanti <b>ROLL</b> (<kbd>Q</kbd> <kbd>E</kbd>): quando la stazione ti sembra ferma sei sincronizzato. Poi centra il portello nel mirino con la <b>cloche</b> (frecce) e avvicinati piano con la <b>leva di spinta</b> a sinistra (<kbd>G</kbd> avanti, <kbd>F</kbd> indietro, oppure <kbd>W</kbd> <kbd>S</kbd>).<br>All\'aggancio servono: centro entro 25 cm, meno di 0,35 m/s, rollio entro 5° e rotazione entro 3°/s.',
     sens: 'SENSIBILITÀ', mode: 'MOVIMENTO', invert: 'ASSE Y', invNormal: 'NORMALE', invInverted: 'INVERTITO',
     stickLbl: 'LATERALE', thrust: 'SPINTA', stickAria: 'Spostamento laterale', thrustAria: 'Spinta avanti e indietro',
@@ -337,7 +338,7 @@ const STR = {
     issInfo: (alt, v) => `ISS · ${alt} KM · ${v} KM/S`,
   },
   en: {
-    back: '← GLOBE', start: '▶ START', retry: '↻ RETRY', levelsBtn: 'LEVELS', startTitle: 'DOCKING WITH THE ISS',
+    back: '← GLOBE', info: 'ABOUT', start: '▶ START', retry: '↻ RETRY', levelsBtn: 'LEVELS', startTitle: 'DOCKING WITH THE ISS',
     startText: 'The station spins around the axis of its docking port. Spin your ship at the same rate with the <b>ROLL</b> buttons (<kbd>Q</kbd> <kbd>E</kbd>): when the station looks still you are synchronized. Then center the port in the reticle with the <b>stick</b> (arrow keys) and close in slowly with the <b>thrust lever</b> on the left (<kbd>G</kbd> forward, <kbd>F</kbd> back, or <kbd>W</kbd> <kbd>S</kbd>).<br>To latch you need: centered within 25 cm, under 0.35 m/s, roll within 5° and spin within 3°/s.',
     sens: 'SENSITIVITY', mode: 'MOVEMENT', invert: 'Y AXIS', invNormal: 'NORMAL', invInverted: 'INVERTED',
     stickLbl: 'LATERAL', thrust: 'THRUST', stickAria: 'Lateral translation', thrustAria: 'Forward and back thrust',

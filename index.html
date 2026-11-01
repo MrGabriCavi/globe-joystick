@@ -149,6 +149,12 @@
   .lang-btn:hover, .lang-btn:focus-visible { opacity: 1; transform: scale(1.12); }
   .lang-btn:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
   .lang-btn svg { display: block; width: 100%; height: 100%; }
+  /* Informazioni, crediti e privacy: in basso a sinistra, speculare alla bandierina */
+  .info-link {
+    position: absolute; bottom: 10px; left: 20px; padding: 5px 8px; border-radius: 999px;
+    font-size: 6px; color: var(--dim); text-decoration: none; border: 1px solid #33333d; background: #101014;
+  }
+  .info-link:hover, .info-link:focus-visible { color: var(--amber); border-color: var(--amber); }
 
   #stick { width: var(--stick); height: var(--stick); display: block; touch-action: none; cursor: grab; }
   #stick.grabbing { cursor: grabbing; }
@@ -226,6 +232,7 @@
       border-radius: 18px 18px 0 0; border-bottom: 0;
     }
     .lang-btn { bottom: calc(8px + env(safe-area-inset-bottom)); right: 14px; }
+    .info-link { bottom: calc(9px + env(safe-area-inset-bottom)); left: 14px; }
     .hint { display: none; }
     .card {
       right: calc(12px + env(safe-area-inset-right));
@@ -292,6 +299,7 @@
 
 <section class="deck" id="deck">
   <button class="lang-btn" id="btnLang"></button>
+  <a class="info-link" href="about.html" data-i18n="info">INFO</a>
   <div class="readout">
     <div class="leds" id="leds">
       <span>↖</span><span>↑</span><span>↗</span>
@@ -354,7 +362,7 @@ const STR = {
     allTitle: 'TUTTI GLI OGGETTI · N2YO', allLoading: 'Chiedo a N2YO tutto quello che hai sopra la testa…',
     allSome: (n, min, at) => `${n} oggetti sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}). Satelliti e stazioni sono icone singole; stadi di razzo e detriti, da lontano, sono raggruppati: tocca un gruppo per avvicinarti, o un nome qui sotto per andarci.`,
     allHidden: (n) => `Altri ${n} sono stadi di razzo e detriti: per vederli, arma l'interruttore MASTER ARM.`,
-    dockTry: '▶ PROVA L\'ATTRACCO',
+    dockTry: '▶ PROVA L\'ATTRACCO', info: 'INFO',
     armTitle: 'MASTER ARM: in SAFE solo satelliti e stazioni spaziali, in ARM anche stadi di razzo e detriti',
     allMore: (n) => `…e altri ${n}.`, allNone: 'N2YO non vede niente sopra di te adesso.',
     allBusy: 'Troppe richieste a N2YO in questo momento: riprova fra qualche minuto.',
@@ -391,7 +399,7 @@ const STR = {
     allTitle: 'EVERYTHING · N2YO', allLoading: 'Asking N2YO for everything above your head…',
     allSome: (n, min, at) => `${n} objects are more than ${min}° above the horizon (positions at ${at}). Satellites and stations are single icons; rocket bodies and debris are grouped from afar: tap a group to zoom in, or a name below to go there.`,
     allHidden: (n) => `${n} more are rocket bodies and debris: flip the MASTER ARM switch to see them.`,
-    dockTry: '▶ TRY DOCKING',
+    dockTry: '▶ TRY DOCKING', info: 'ABOUT',
     armTitle: 'MASTER ARM: SAFE shows only satellites and space stations, ARM adds rocket bodies and debris',
     allMore: (n) => `…and ${n} more.`, allNone: 'N2YO sees nothing above you right now.',
     allBusy: 'Too many requests to N2YO right now: try again in a few minutes.',

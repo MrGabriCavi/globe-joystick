@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05060a">
+<title>Globe Stick · Info</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #05060a; --ink: #e8e6df; --dim: #8c8c98; --amber: #ffb000; --red: #ff2a2a; --line: #23232b; }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); }
+  body {
+    margin: 0; color: var(--ink); background: var(--bg);
+    font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  main { max-width: 820px; margin: 0 auto; padding: 28px 16px 64px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .brand { font: 14px 'Press Start 2P', monospace; letter-spacing: 2px; color: var(--amber); text-shadow: 0 0 8px rgba(255,176,0,.5); }
+  .brand span { color: var(--red); }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    display: inline-block; padding: 8px 11px; border-radius: 999px; border: 1px solid #3a3a44; background: #16161c;
+    font: 8px 'Press Start 2P', monospace; color: var(--ink); text-decoration: none; cursor: pointer;
+  }
+  .pill:hover { border-color: var(--amber); color: var(--amber); }
+  h1 { margin: 32px 0 6px; font: 15px/1.6 'Press Start 2P', monospace; color: var(--amber); }
+  h2 { margin: 36px 0 8px; padding-top: 18px; border-top: 1px solid var(--line); font: 11px/1.6 'Press Start 2P', monospace; color: var(--amber); }
+  p, li { color: #d4d2ca; }
+  .lead { color: var(--ink); font-size: 17px; }
+  a { color: #8fd6ff; }
+  ul { padding-left: 20px; }
+  li { margin: 6px 0; }
+  .note { padding: 12px 14px; border-left: 3px solid var(--amber); background: #111116; border-radius: 0 8px 8px 0; }
+  .table { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font: 8px/1.6 'Press Start 2P', monospace; color: var(--dim); }
+  footer { margin-top: 48px; color: var(--dim); font-size: 13px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand">GLOBE<span>·</span>STICK</div>
+    <nav>
+      <a class="pill" href="index.html" data-it="← GLOBO" data-en="← GLOBE">← GLOBO</a>
+      <a class="pill" href="dock.html" data-it="ATTRACCO" data-en="DOCKING">ATTRACCO</a>
+      <button class="pill" id="btnLang" type="button">ENGLISH</button>
+    </nav>
+  </header>
+
+  <!-- ============================================================ ITALIANO -->
+  <article lang="it">
+    <h1>Informazioni</h1>
+    <p class="lead">Globe Stick è un globo 3D con i satelliti veri, da far ruotare con una cloche da caccia, con un
+      minigioco di attracco alla Stazione spaziale internazionale. È un progetto amatoriale e didattico,
+      gratuito e senza pubblicità.</p>
+
+    <h2>Come funziona</h2>
+    <ul>
+      <li>Le posizioni dei satelliti sono calcolate nel browser con il modello SGP4, a partire dagli elementi
+        orbitali pubblicati da CelesTrak e aggiornati ogni 2 ore.</li>
+      <li>«Sopra di me» elenca, grazie a N2YO, tutti gli oggetti che hai sopra la testa: satelliti, stazioni,
+        stadi di razzo e detriti.</li>
+      <li>Il minigioco di attracco è una simulazione semplificata a scopo di gioco: la ISS reale non gira su sé
+        stessa e gli attracchi veri seguono procedure diverse.</li>
+    </ul>
+    <p class="note">Posizioni, orbite e dati sono stime a scopo informativo e di svago: possono differire da quelle
+      reali e non vanno usati per navigazione, osservazioni professionali o decisioni di sicurezza.</p>
+
+    <h2>Crediti e fonti</h2>
+    <p>Nessuna di queste risorse è inclusa nel codice del progetto: la pagina le carica mentre gira.</p>
+    <div class="table"><table>
+      <tr><th>Cosa</th><th>Fonte</th><th>Licenza / condizioni</th></tr>
+      <tr><td>Elementi orbitali e catalogo SATCAT</td><td><a href="https://celestrak.org">CelesTrak</a> (Dr. T.S. Kelso)</td><td>Uso gratuito secondo le condizioni di CelesTrak; il sito li scarica al massimo ogni 2 ore</td></tr>
+      <tr><td>Oggetti sopra un punto</td><td><a href="https://www.n2yo.com">N2YO.com</a>, API "What's up?"</td><td>Secondo i termini d'uso dell'API di N2YO</td></tr>
+      <tr><td>Calcolo delle orbite (SGP4)</td><td><a href="https://github.com/shashwatak/satellite-js">satellite.js</a></td><td>MIT</td></tr>
+      <tr><td>Grafica 3D</td><td><a href="https://threejs.org">three.js</a></td><td>MIT</td></tr>
+      <tr><td>Immagini della Terra (superficie, rilievo, mari)</td><td><a href="https://visibleearth.nasa.gov/collection/1484/blue-marble">NASA Visible Earth, Blue Marble</a>, tramite il pacchetto <a href="https://github.com/vasturiano/three-globe">three-globe</a></td><td>Immagini NASA di pubblico dominio; pacchetto MIT</td></tr>
+      <tr><td>Descrizioni e collegamenti alle voci</td><td><a href="https://www.wikidata.org">Wikidata</a>, <a href="https://www.wikipedia.org">Wikipedia</a></td><td>Wikidata: CC0; testi di Wikipedia: CC BY-SA, consultabili dal link</td></tr>
+      <tr><td>Foto dei satelliti</td><td><a href="https://commons.wikimedia.org">Wikimedia Commons</a></td><td>Licenza propria di ogni file (spesso CC BY-SA): autore e licenza nella pagina del file, raggiungibile dal link sotto ogni foto</td></tr>
+      <tr><td>Posizione approssimativa (facoltativa)</td><td><a href="https://www.geojs.io">GeoJS</a></td><td>Servizio gratuito, usato solo se lo scegli</td></tr>
+      <tr><td>Carattere pixel</td><td><a href="https://fonts.google.com/specimen/Press+Start+2P">Press Start 2P</a> di CodeMan38, via Google Fonts</td><td>SIL Open Font License 1.1</td></tr>
+      <tr><td>Distribuzione delle librerie</td><td><a href="https://www.jsdelivr.com">jsDelivr</a></td><td>CDN gratuita</td></tr>
+    </table></div>
+
+    <h2>Proprietà intellettuale</h2>
+    <ul>
+      <li>Il codice di Globe Stick è © 2026 MrGabri ed è distribuito con
+        <a href="https://github.com/MrGabriCavi/globe-joystick/blob/main/LICENSE">licenza MIT</a>.</li>
+      <li>La grafica originale del progetto (cloche, pannello comandi, interruttore MASTER ARM, icone dei satelliti,
+        modello semplificato della ISS, strumenti del cruscotto) è disegnata nel codice e rientra nella stessa licenza.</li>
+      <li>Dati, immagini, testi, librerie e caratteri di terzi restano di proprietà dei rispettivi titolari e sono
+        usati secondo le loro licenze, elencate sopra. La licenza MIT del progetto non si estende a questi materiali.</li>
+      <li>Nomi e marchi citati, tra cui ISS, NASA, ESA, Roscosmos, CNSA, SpaceX, Starlink, GPS, Galileo, CelesTrak,
+        N2YO, Wikipedia e Wikimedia, appartengono ai rispettivi titolari e sono usati solo per identificare oggetti e
+        fonti. Globe Stick non è affiliato a nessuno di loro, né da loro approvato o sponsorizzato.</li>
+      <li>Se ritieni che un contenuto mostrato violi un tuo diritto, apri una segnalazione sul
+        <a href="https://github.com/MrGabriCavi/globe-joystick/issues">repository GitHub</a>: verrà corretto o rimosso.</li>
+    </ul>
+
+    <h2>Privacy</h2>
+    <ul>
+      <li>Nessun cookie, nessuna pubblicità, nessuno strumento di analisi o di tracciamento.</li>
+      <li>Le preferenze (lingua, gruppo di satelliti, MASTER ARM, regolazioni del gioco) e una copia dei dati orbitali
+        restano nel tuo browser (localStorage) e non vengono inviate a nessuno.</li>
+      <li><b>Posizione.</b> «Sopra di me» la chiede al browser solo quando premi il pulsante, e la usa per calcolare cosa
+        hai sopra la testa. Per l'elenco completo le coordinate vengono inviate al server del sito arrotondate a mezzo
+        grado (circa 50 km) e da lì a N2YO; il server non le registra. Se scegli la posizione approssimativa, il browser
+        chiede a GeoJS una stima basata sul tuo indirizzo IP.</li>
+      <li>Come ogni sito, la pagina carica risorse da servizi esterni che ricevono il tuo indirizzo IP: jsDelivr
+        (librerie e immagini della Terra), Google Fonts (carattere), Wikidata e Wikimedia (schede dei satelliti),
+        Cloudflare (rete che porta al sito).</li>
+      <li>Il server registra, per sicurezza e per i limiti di traffico, l'indirizzo IP e l'indirizzo della richiesta,
+        mai le coordinate.</li>
+    </ul>
+  </article>
+
+  <!-- ============================================================ ENGLISH -->
+  <article lang="en" hidden>
+    <h1>About</h1>
+    <p class="lead">Globe Stick is a 3D globe with real satellites that you spin with a fighter-jet flight stick, plus a
+      docking mini-game with the International Space Station. It is a free, ad-free hobby and learning project.</p>
+
+    <h2>How it works</h2>
+    <ul>
+      <li>Satellite positions are computed in the browser with the SGP4 model, from the orbital elements published by
+        CelesTrak and refreshed every 2 hours.</li>
+      <li>"Above me" uses N2YO to list every object above your head: satellites, stations, rocket bodies and debris.</li>
+      <li>The docking mini-game is a simplified simulation for fun: the real ISS does not spin, and real dockings follow
+        different procedures.</li>
+    </ul>
+    <p class="note">Positions, orbits and data are estimates for information and fun: they may differ from reality and
+      must not be used for navigation, professional observation or safety decisions.</p>
+
+    <h2>Credits and sources</h2>
+    <p>None of these resources is included in the project's code: the page loads them while it runs.</p>
+    <div class="table"><table>
+      <tr><th>What</th><th>Source</th><th>License / terms</th></tr>
+      <tr><td>Orbital elements and SATCAT catalog</td><td><a href="https://celestrak.org">CelesTrak</a> (Dr. T.S. Kelso)</td><td>Free use under CelesTrak's terms; the site downloads them at most every 2 hours</td></tr>
+      <tr><td>Objects above a point</td><td><a href="https://www.n2yo.com">N2YO.com</a>, "What's up?" API</td><td>Under the N2YO API terms of use</td></tr>
+      <tr><td>Orbit computation (SGP4)</td><td><a href="https://github.com/shashwatak/satellite-js">satellite.js</a></td><td>MIT</td></tr>
+      <tr><td>3D graphics</td><td><a href="https://threejs.org">three.js</a></td><td>MIT</td></tr>
+      <tr><td>Earth imagery (surface, relief, water)</td><td><a href="https://visibleearth.nasa.gov/collection/1484/blue-marble">NASA Visible Earth, Blue Marble</a>, via the <a href="https://github.com/vasturiano/three-globe">three-globe</a> package</td><td>NASA public-domain imagery; package MIT</td></tr>
+      <tr><td>Descriptions and article links</td><td><a href="https://www.wikidata.org">Wikidata</a>, <a href="https://www.wikipedia.org">Wikipedia</a></td><td>Wikidata: CC0; Wikipedia text: CC BY-SA, reached through the link</td></tr>
+      <tr><td>Satellite photos</td><td><a href="https://commons.wikimedia.org">Wikimedia Commons</a></td><td>Each file has its own license (often CC BY-SA): author and license on the file page, linked under every photo</td></tr>
+      <tr><td>Approximate location (optional)</td><td><a href="https://www.geojs.io">GeoJS</a></td><td>Free service, used only if you choose it</td></tr>
+      <tr><td>Pixel font</td><td><a href="https://fonts.google.com/specimen/Press+Start+2P">Press Start 2P</a> by CodeMan38, via Google Fonts</td><td>SIL Open Font License 1.1</td></tr>
+      <tr><td>Library delivery</td><td><a href="https://www.jsdelivr.com">jsDelivr</a></td><td>Free CDN</td></tr>
+    </table></div>
+
+    <h2>Intellectual property</h2>
+    <ul>
+      <li>Globe Stick's code is © 2026 MrGabri and is released under the
+        <a href="https://github.com/MrGabriCavi/globe-joystick/blob/main/LICENSE">MIT license</a>.</li>
+      <li>The project's original artwork (flight stick, control panel, MASTER ARM switch, satellite icons, simplified ISS
+        model, dashboard instruments) is drawn in code and covered by the same license.</li>
+      <li>Third-party data, images, text, libraries and fonts remain the property of their respective owners and are used
+        under their licenses, listed above. The project's MIT license does not extend to them.</li>
+      <li>Names and trademarks mentioned, including ISS, NASA, ESA, Roscosmos, CNSA, SpaceX, Starlink, GPS, Galileo,
+        CelesTrak, N2YO, Wikipedia and Wikimedia, belong to their respective owners and are used only to identify
+        objects and sources. Globe Stick is not affiliated with, endorsed or sponsored by any of them.</li>
+      <li>If you believe something shown here infringes your rights, please open an issue on the
+        <a href="https://github.com/MrGabriCavi/globe-joystick/issues">GitHub repository</a>: it will be fixed or removed.</li>
+    </ul>
+
+    <h2>Privacy</h2>
+    <ul>
+      <li>No cookies, no ads, no analytics or tracking tools.</li>
+      <li>Preferences (language, satellite group, MASTER ARM, game settings) and a copy of the orbital data stay in your
+        browser (localStorage) and are not sent to anyone.</li>
+      <li><b>Location.</b> "Above me" asks the browser for it only when you press the button, and uses it to work out what
+        is above you. For the full list, the coordinates are sent to the site's server rounded to half a degree (about
+        50 km) and from there to N2YO; the server does not store them. If you choose the approximate location, the
+        browser asks GeoJS for an estimate based on your IP address.</li>
+      <li>Like any website, the page loads resources from external services that receive your IP address: jsDelivr
+        (libraries and Earth imagery), Google Fonts (font), Wikidata and Wikimedia (satellite cards), Cloudflare (the
+        network in front of the site).</li>
+      <li>For security and traffic limits, the server logs the IP address and the requested URL, never the coordinates.</li>
+    </ul>
+  </article>
+
+  <footer>Globe Stick · © 2026 MrGabri · <a href="https://github.com/MrGabriCavi/globe-joystick">GitHub</a></footer>
+</main>
+<script>
+  // Stessa lingua delle altre pagine (chiave 'lang' nel browser); il pulsante passa all'altra.
+  let lang = 'it';
+  try { lang = localStorage.getItem('lang') || ''; } catch { /* storage non disponibile */ }
+  if (lang !== 'it' && lang !== 'en') lang = (navigator.language || '').toLowerCase().startsWith('it') ? 'it' : 'en';
+  function apply() {
+    document.documentElement.lang = lang;
+    for (const a of document.querySelectorAll('article')) a.hidden = a.lang !== lang;
+    for (const el of document.querySelectorAll('[data-it]')) el.textContent = el.dataset[lang];
+    document.getElementById('btnLang').textContent = lang === 'it' ? 'ENGLISH' : 'ITALIANO';
+    document.title = lang === 'it' ? 'Globe Stick · Info' : 'Globe Stick · About';
+  }
+  document.getElementById('btnLang').addEventListener('click', () => {
+    lang = lang === 'it' ? 'en' : 'it';
+    try { localStorage.setItem('lang', lang); } catch { /* ok */ }
+    apply();
+  });
+  apply();
+</script>
+</body>
+</html>
