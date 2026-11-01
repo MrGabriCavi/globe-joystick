@@ -156,6 +156,35 @@
   }
   .info-link:hover, .info-link:focus-visible { color: var(--amber); border-color: var(--amber); }
 
+  /* Saluto di Gabriele: avatar con fumetto in basso a sinistra, si chiude e non torna */
+  .host {
+    position: fixed; z-index: 5;
+    left: calc(16px + env(safe-area-inset-left)); bottom: calc(16px + env(safe-area-inset-bottom));
+    display: flex; align-items: flex-end; gap: 10px; max-width: min(360px, calc(100vw - 32px));
+    pointer-events: none;
+  }
+  .host[hidden] { display: none; }
+  .host img {
+    width: 72px; height: 72px; flex: none; border-radius: 50%;
+    border: 2px solid var(--amber); box-shadow: 0 6px 24px rgba(0,0,0,.6); background: #101014;
+  }
+  .host-bubble {
+    position: relative; margin-bottom: 30px; padding: 12px 30px 12px 14px; pointer-events: auto;
+    font-size: 9px; line-height: 1.7; color: #e8e8ec;
+    background: linear-gradient(#18181e, #0d0d11); border: 1px solid #2a2a33; border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.65);
+  }
+  .host-bubble::before {   /* la punta del fumetto verso l'avatar */
+    content: ''; position: absolute; left: -7px; bottom: 14px; width: 12px; height: 12px;
+    background: #111116; border-left: 1px solid #2a2a33; border-bottom: 1px solid #2a2a33;
+    transform: rotate(45deg);
+  }
+  .host-close {
+    position: absolute; top: 4px; right: 6px; padding: 2px 6px; border: 0; background: none;
+    color: var(--dim); font: inherit; font-size: 11px; cursor: pointer;
+  }
+  .host-close:hover, .host-close:focus-visible { color: var(--amber); }
+
   #stick { width: var(--stick); height: var(--stick); display: block; touch-action: none; cursor: grab; }
   #stick.grabbing { cursor: grabbing; }
 
@@ -207,6 +236,26 @@
   .arm[aria-checked="true"] .arm-lever { transform: rotate(180deg); }
   .arm[aria-checked="true"] .arm-state { color: var(--red); text-shadow: 0 0 6px var(--red); }
 
+  /* Leva dello zoom, come la manetta di un aereo: su avvicina, giù allontana */
+  .zoom { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 6px; color: var(--dim); }
+  .zoom-track {
+    position: relative; width: 26px; height: calc(var(--stick) - 18px); border-radius: 13px;
+    background: linear-gradient(90deg, #050507, #15151b 50%, #050507); border: 1px solid #2a2a33;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.7); cursor: ns-resize; touch-action: none;
+  }
+  .zoom-track::before {   /* tacche */
+    content: ''; position: absolute; inset: 10px 5px; pointer-events: none;
+    background: repeating-linear-gradient(#3a3a44 0 1px, transparent 1px 12%);
+  }
+  .zoom-knob {
+    position: absolute; left: -7px; width: 38px; height: 20px; margin-top: -10px; border-radius: 6px;
+    background: linear-gradient(#f2f2f6, #9a9aa4 55%, #55555f); border: 1px solid #040405;
+    box-shadow: 0 4px 8px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.7);
+    pointer-events: none;
+  }
+  .zoom-knob::after { content: ''; position: absolute; left: 6px; right: 6px; top: 9px; height: 2px; background: var(--amber); }
+  .zoom-track:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; }
+
   .buttons { display: flex; flex-direction: column; gap: 12px; }
   .btn { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 6px; color: var(--dim); }
   .arcade {
@@ -233,6 +282,10 @@
     }
     .lang-btn { bottom: calc(8px + env(safe-area-inset-bottom)); right: 14px; }
     .info-link { bottom: calc(9px + env(safe-area-inset-bottom)); left: 14px; }
+    /* Il saluto sale sopra il pannello, che qui occupa tutta la larghezza */
+    .host { left: 10px; bottom: calc(var(--deck-h, 260px) + 10px); }
+    .host img { width: 52px; height: 52px; }
+    .host-bubble { margin-bottom: 22px; font-size: 8px; }
     .hint { display: none; }
     .card {
       right: calc(12px + env(safe-area-inset-right));
@@ -246,6 +299,8 @@
     .leds { grid-template-columns: repeat(3, 19px); gap: 4px; }
     .leds span { width: 19px; height: 19px; }
     .arcade { width: 42px; height: 42px; }
+    .zoom-track { width: 22px; }
+    .zoom-knob { left: -6px; width: 32px; }
   }
 </style>
 <script type="importmap">
@@ -276,7 +331,7 @@
     <button class="pill rec-btn" data-record="closest" data-i18n="recClosest" data-i18n-title="recClosestTitle">↓ IL PIÙ VICINO</button>
   </div>
 </header>
-<p class="hint" data-i18n-html="hint">Trascina la leva · Frecce o WASD<br>Rotella o pinch per lo zoom<br>Clic su un satellite per la scheda</p>
+<p class="hint" data-i18n-html="hint">Trascina la leva · Frecce o WASD<br>Zoom: leva, rotella, pinch o + e −<br>Clic su un satellite per la scheda</p>
 
 <aside class="card" id="card" hidden>
   <button class="card-close" id="cardClose" data-i18n-aria="close" aria-label="Chiudi">✕</button>
@@ -297,6 +352,14 @@
   <a class="dock-btn" id="cardDock" href="dock.html" hidden data-i18n="dockTry">▶ PROVA L'ATTRACCO</a>
 </aside>
 
+<aside class="host" id="host" hidden>
+  <img src="avatar.webp" alt="" width="72" height="72">
+  <div class="host-bubble" role="note">
+    <span data-i18n="hostSays"></span>
+    <button class="host-close" id="hostClose" data-i18n-aria="close" aria-label="Chiudi">✕</button>
+  </div>
+</aside>
+
 <section class="deck" id="deck">
   <button class="lang-btn" id="btnLang"></button>
   <a class="info-link" href="about.html" data-i18n="info">INFO</a>
@@ -314,6 +377,11 @@
     </button>
   </div>
   <canvas id="stick" role="application" data-i18n-aria="stickAria" aria-label="Joystick: trascina o usa le frecce"></canvas>
+  <div class="zoom">
+    <div class="zoom-track" id="zoomLever" role="slider" tabindex="0" aria-orientation="vertical"
+         aria-valuemin="0" aria-valuemax="100" data-i18n-aria="zoomAria" aria-label="Zoom"><div class="zoom-knob" id="zoomKnob"></div></div>
+    ZOOM
+  </div>
   <div class="buttons">
     <div class="btn"><button class="arcade" id="btnReset" data-i18n-aria="resetAria" aria-label="Torna a Roma"></button>RESET</div>
     <div class="btn"><button class="arcade yellow" id="btnMode" data-i18n-aria="modeAria" aria-label="Cambia modalità"></button><span id="modeLabel">VOLA</span></div>
@@ -338,9 +406,9 @@ const STR = {
     recFastest: '» IL PIÙ VELOCE', recSlowest: '« IL PIÙ LENTO', recFarthest: '↑ IL PIÙ LONTANO', recClosest: '↓ IL PIÙ VICINO',
     recFastestTitle: 'Il satellite più veloce del gruppo', recSlowestTitle: 'Il satellite più lento del gruppo',
     recFarthestTitle: 'Il satellite del gruppo più lontano dalla Terra', recClosestTitle: 'Il satellite del gruppo più vicino alla Terra',
-    hint: 'Trascina la leva · Frecce o WASD<br>Rotella o pinch per lo zoom<br>Clic su un satellite per la scheda',
+    hint: 'Trascina la leva · Frecce o WASD<br>Zoom: leva, rotella, pinch o + e −<br>Clic su un satellite per la scheda',
     close: 'Chiudi', photoCredit: 'Foto: Wikimedia Commons · autore e licenza ↗', center: 'CENTRA',
-    stickAria: 'Joystick: trascina o usa le frecce', resetAria: 'Torna a Roma', modeAria: 'Cambia modalità',
+    stickAria: 'Joystick: trascina o usa le frecce', resetAria: 'Torna a Roma', modeAria: 'Cambia modalità', zoomAria: 'Zoom: trascina la leva o usa + e −',
     modeFly: 'VOLA', modeDrag: 'RUOTA', langSwitch: 'English',
     satLive: (n) => `${n} SAT · IN DIRETTA`, satUpdated: (n, at, left) => `${n} SAT · AGG ${at} · ⟳ ${left}`,
     satLoading: 'CARICO SATELLITI…', dataUnavailable: 'DATI NON DISPONIBILI',
@@ -363,6 +431,7 @@ const STR = {
     allSome: (n, min, at) => `${n} oggetti sono più alti di ${min}° sull'orizzonte (posizioni delle ${at}). Satelliti e stazioni sono icone singole; stadi di razzo e detriti, da lontano, sono raggruppati: tocca un gruppo per avvicinarti, o un nome qui sotto per andarci.`,
     allHidden: (n) => `Altri ${n} sono stadi di razzo e detriti: per vederli, arma l'interruttore MASTER ARM.`,
     dockTry: '▶ PROVA L\'ATTRACCO', info: 'INFO',
+    hostSays: 'Divertiti con i satelliti e le stazioni spaziali! Nascosto da qualche parte c’è anche un gioco per i più coraggiosi: sai scovarlo?',
     armTitle: 'MASTER ARM: in SAFE solo satelliti e stazioni spaziali, in ARM anche stadi di razzo e detriti',
     allMore: (n) => `…e altri ${n}.`, allNone: 'N2YO non vede niente sopra di te adesso.',
     allBusy: 'Troppe richieste a N2YO in questo momento: riprova fra qualche minuto.',
@@ -375,9 +444,9 @@ const STR = {
     recFastest: '» FASTEST', recSlowest: '« SLOWEST', recFarthest: '↑ FARTHEST', recClosest: '↓ CLOSEST',
     recFastestTitle: 'The fastest satellite in the group', recSlowestTitle: 'The slowest satellite in the group',
     recFarthestTitle: 'The satellite in the group farthest from Earth', recClosestTitle: 'The satellite in the group closest to Earth',
-    hint: 'Drag the stick · Arrows or WASD<br>Wheel or pinch to zoom<br>Click a satellite for details',
+    hint: 'Drag the stick · Arrows or WASD<br>Zoom: lever, wheel, pinch or + and −<br>Click a satellite for details',
     close: 'Close', photoCredit: 'Photo: Wikimedia Commons · author and license ↗', center: 'CENTER',
-    stickAria: 'Joystick: drag or use the arrow keys', resetAria: 'Back to Rome', modeAria: 'Switch mode',
+    stickAria: 'Joystick: drag or use the arrow keys', resetAria: 'Back to Rome', modeAria: 'Switch mode', zoomAria: 'Zoom: drag the lever or use + and −',
     modeFly: 'FLY', modeDrag: 'ROTATE', langSwitch: 'Italiano',
     satLive: (n) => `${n} SAT · LIVE`, satUpdated: (n, at, left) => `${n} SAT · UPD ${at} · ⟳ ${left}`,
     satLoading: 'LOADING SATELLITES…', dataUnavailable: 'DATA UNAVAILABLE',
@@ -400,6 +469,7 @@ const STR = {
     allSome: (n, min, at) => `${n} objects are more than ${min}° above the horizon (positions at ${at}). Satellites and stations are single icons; rocket bodies and debris are grouped from afar: tap a group to zoom in, or a name below to go there.`,
     allHidden: (n) => `${n} more are rocket bodies and debris: flip the MASTER ARM switch to see them.`,
     dockTry: '▶ TRY DOCKING', info: 'ABOUT',
+    hostSays: 'Have fun with the satellites and space stations! Somewhere there’s also a hidden game for the bravest: can you find it?',
     armTitle: 'MASTER ARM: SAFE shows only satellites and space stations, ARM adds rocket bodies and debris',
     allMore: (n) => `…and ${n} more.`, allNone: 'N2YO sees nothing above you right now.',
     allBusy: 'Too many requests to N2YO right now: try again in a few minutes.',
@@ -632,6 +702,31 @@ for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) {
 }
 function setZoom(z) { view.zoom = THREE.MathUtils.clamp(z, 0.12, 2.6); updateCameraDistance(); }
 
+/* Leva dello zoom: posizione 0 (giù, lontano) .. 1 (su, vicino), in scala logaritmica come la rotella */
+const ZMIN = Math.log(0.12), ZMAX = Math.log(2.6);
+const zoomToLever = (z) => (Math.log(z) - ZMIN) / (ZMAX - ZMIN);
+let leverDrag = null;
+function leverAt(e) {
+  const r = $('zoomLever').getBoundingClientRect();
+  const v = THREE.MathUtils.clamp(1 - (e.clientY - r.top - 10) / (r.height - 20), 0, 1);
+  view.zoomTarget = null;
+  setZoom(Math.exp(ZMIN + v * (ZMAX - ZMIN)));
+}
+$('zoomLever').addEventListener('pointerdown', (e) => { leverDrag = e.pointerId; $('zoomLever').setPointerCapture(e.pointerId); leverAt(e); });
+$('zoomLever').addEventListener('pointermove', (e) => { if (leverDrag === e.pointerId) leverAt(e); });
+for (const ev of ['pointerup', 'pointercancel']) $('zoomLever').addEventListener(ev, () => { leverDrag = null; });
+function zoomStep(dir) { view.zoomTarget = THREE.MathUtils.clamp((view.zoomTarget ?? view.zoom) * (dir > 0 ? 1.4 : 1 / 1.4), 0.12, 2.6); }
+$('zoomLever').addEventListener('keydown', (e) => {
+  if (e.code === 'ArrowUp' || e.code === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); zoomStep(1); }
+  if (e.code === 'ArrowDown' || e.code === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); zoomStep(-1); }
+});
+function syncZoomLever() {
+  const v = zoomToLever(view.zoom);
+  const r = $('zoomLever').clientHeight;
+  $('zoomKnob').style.top = `${10 + (1 - v) * (r - 20)}px`;
+  $('zoomLever').setAttribute('aria-valuenow', String(Math.round(v * 100)));
+}
+
 /* =========================================================================
    Joystick arcade
    Valore normalizzato: x, y in [-1, 1], y positivo = leva spinta in alto.
@@ -698,6 +793,8 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.('select, input, textarea')) return;
   const k = KEYMAP[e.code];
   if (k) { e.preventDefault(); joy.keys.add(k); view.homing = null; }
+  else if (e.code === 'Equal' || e.code === 'NumpadAdd') zoomStep(1);
+  else if (e.code === 'Minus' || e.code === 'NumpadSubtract') zoomStep(-1);
   else if (e.code === 'KeyR') resetView();
   else if (e.code === 'KeyM') toggleMode();
   else if (e.code === 'KeyI') goToIss();
@@ -1935,6 +2032,14 @@ $('btnArm').addEventListener('click', () => {
 });
 applyArm();
 
+/* ---------- Saluto ---------- */
+new ResizeObserver(() => document.documentElement.style.setProperty('--deck-h', `${$('deck').offsetHeight}px`)).observe($('deck'));
+try { $('host').hidden = localStorage.getItem('hostClosed') === '1'; } catch { $('host').hidden = false; }
+$('hostClose').addEventListener('click', () => {
+  $('host').hidden = true;
+  try { localStorage.setItem('hostClosed', '1'); } catch { /* ok */ }
+});
+
 $('btnLang').addEventListener('click', () => {
   lang = lang === 'it' ? 'en' : 'it';
   try { localStorage.setItem('lang', lang); } catch { /* ok */ }
@@ -1977,6 +2082,7 @@ function frame(now) {
     setZoom(view.zoom + (view.zoomTarget - view.zoom) * k);
     if (Math.abs(view.zoomTarget - view.zoom) < 1e-3) view.zoomTarget = null;
   }
+  syncZoomLever();
   if (view.homing) {
     view.spin += wrapPi(view.homing.spin - view.spin) * k;
     view.tilt += (view.homing.tilt - view.tilt) * k;
