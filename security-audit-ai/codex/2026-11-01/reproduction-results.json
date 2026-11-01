@@ -1,0 +1,14 @@
+{
+  "concurrent_same_point": {
+    "statuses": [
+      200,
+      200
+    ],
+    "upstream_calls": 2
+  },
+  "head_spends_quota": {
+    "upstream_calls": 1,
+    "response_body_bytes": 0
+  },
+  "upstream_null": "uncaught TypeError instead of HTTP 502"
+}

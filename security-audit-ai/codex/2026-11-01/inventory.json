@@ -1,0 +1,97 @@
+[
+  {
+    "path": ".dockerignore",
+    "bytes": 85,
+    "sha256": "F2B182DAFCB6320C2C8D65B25060817CA1DDFE491038D0580DEC2CE74440C7A7"
+  },
+  {
+    "path": ".gitattributes",
+    "bytes": 113,
+    "sha256": "A93375D6914F26646E0D45D0A2D9DE6DD976D27CE4779EF12B7520F2BC4BA285"
+  },
+  {
+    "path": ".gitignore",
+    "bytes": 68,
+    "sha256": "682FAE4E99EBB5241291B659582EB31E3F8AA157ABC7C1E7EFF5FA2C756DE75E"
+  },
+  {
+    "path": "about.html",
+    "bytes": 15306,
+    "sha256": "AC5DA013FA500612A9CDDED30050F6E8DCFABA6D33FFFA4696E1DADDCF3DD643"
+  },
+  {
+    "path": "api\\Dockerfile",
+    "bytes": 361,
+    "sha256": "46DA30C369E2CFE2FE6380996C725C2558180D00D60829ABBB6399407E01EB98"
+  },
+  {
+    "path": "api\\server.py",
+    "bytes": 10852,
+    "sha256": "076DABF233D03D7A4EF2A61AC3DB3FC9B6340D66B2A261898255C0F436CEC818"
+  },
+  {
+    "path": "deploy\\stack.yml",
+    "bytes": 2404,
+    "sha256": "9A3BDB667C7890E5CFDFE34A163977E680F7429EF0FC27C1DD4748340A2EBB29"
+  },
+  {
+    "path": "dock.html",
+    "bytes": 56115,
+    "sha256": "C165E9D65FA49FF366217E1348EBDE4AD4A089B0D43C62E86A9E25961F7BA08E"
+  },
+  {
+    "path": "Dockerfile",
+    "bytes": 230,
+    "sha256": "AC7DD340D4D44CF6791CD0C4B0FAD26996125641D41DB8198C6A1B3D1C076FC7"
+  },
+  {
+    "path": "docs\\img\\attracco-inizio.jpg",
+    "bytes": 33244,
+    "sha256": "F5F8357C5C47FB3E2DFA6AF31F7D2CBF0902FA8EF8FF973A413E74277DA2934D"
+  },
+  {
+    "path": "docs\\img\\attracco-telefono.jpg",
+    "bytes": 38429,
+    "sha256": "7544A9A185E501E5599A17570BA4DEBC294504345DADCBBD736C0B67E35265FF"
+  },
+  {
+    "path": "docs\\img\\attracco.jpg",
+    "bytes": 37561,
+    "sha256": "005BFAD97A8BFCE866C44404672734008BE1BACFDEEA94C072299DBA7059CEFD"
+  },
+  {
+    "path": "docs\\img\\globo.jpg",
+    "bytes": 61984,
+    "sha256": "558731227B1CB81B08CD4E2C33DC76AEB4D073AE369A18C40C423B5D5A91F963"
+  },
+  {
+    "path": "docs\\img\\iss.jpg",
+    "bytes": 70047,
+    "sha256": "7125B5CFC0F479AFED5B84C34927D8C6426B3B8E9B9C02D8469D6C3A33B5B24F"
+  },
+  {
+    "path": "docs\\img\\sopra-di-me.jpg",
+    "bytes": 98830,
+    "sha256": "B4039B19597F0730EBB68FBB3C0E2A0D409E6B96D1A37C12A55D32E062E2B2F3"
+  },
+  {
+    "path": "docs\\img\\telefono.jpg",
+    "bytes": 53992,
+    "sha256": "DFF0CA95A898C623C9BAA7E9BEE07D09C46C8FA98760CD6DCAA88E88D025FCB1"
+  },
+  {
+    "path": "index.html",
+    "bytes": 97858,
+    "sha256": "774C3F007C0A3F77665121782C33056C1F8371F6F0E81BD599F8C5101A958DF9"
+  },
+  {
+    "path": "LICENSE",
+    "bytes": 1085,
+    "sha256": "4E6DE522D7AD577DF79ADD72AD05F8369CAD2067FF9E57DA899C06C105B4523B"
+  },
+  {
+    "path": "README.md",
+    "bytes": 8622,
+    "sha256": "DFFFB3E7E8629D65C2A10055EC226ED16F014BA148FEA90A08EF61645A528DC2"
+  }
+]
